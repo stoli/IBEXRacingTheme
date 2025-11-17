@@ -1559,3 +1559,57 @@ add_filter('acf/load_value/name=media_gallery_cover_image', function ($value, $p
   return $thumbnail_id ?: $value;
 }, 10, 2);
 
+// v2025-01-XX — Header social media icons
+/**
+ * Render social media icons in the header next to the logo.
+ */
+function ibex_render_header_social_icons(): void
+{
+  // Prevent duplicate output if multiple hooks fire
+  static $rendered = false;
+  if ($rendered) {
+    return;
+  }
+  $rendered = true;
+
+  if (!function_exists('ibex_get_team_social_icon_map') || !function_exists('ibex_get_team_social_label_map')) {
+    return;
+  }
+
+  $icons = ibex_get_team_social_icon_map();
+  $links = [
+    'instagram' => 'https://www.instagram.com/ibexracing',
+    'youtube'   => 'https://www.youtube.com/@ibexracing1874/videos',
+  ];
+
+  $labels = ibex_get_team_social_label_map();
+
+  if (empty($icons) || empty($links)) {
+    return;
+  }
+
+  ?>
+  <div class="ibex-header-social">
+    <?php foreach ($links as $platform => $url) : ?>
+      <?php if (!empty($icons[$platform]) && !empty($url)) : ?>
+        <a
+          class="ibex-header-social__link"
+          href="<?php echo esc_url($url); ?>"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="<?php echo esc_attr($labels[$platform] ?? ucfirst($platform)); ?>"
+        >
+          <span class="ibex-header-social__icon">
+            <?php echo $icons[$platform]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+          </span>
+        </a>
+      <?php endif; ?>
+    <?php endforeach; ?>
+  </div>
+  <?php
+}
+
+// Add social icons in a vertical stack to the left of the logo
+// Using generate_before_logo hook to place icons before the logo
+add_action('generate_before_logo', 'ibex_render_header_social_icons', 15);
+

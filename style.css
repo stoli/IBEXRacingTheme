@@ -4205,3 +4205,128 @@ body.ibex-lightbox-open {
 .page-template-page-media-gallery-dashboard .acf-field[data-type="true_false"] .acf-switch.-on .acf-switch-slider {
   background: #111622;
 }
+
+/* Header social media icons - vertical stack to the left of logo */
+.ibex-header-social {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-right: 1rem;
+}
+
+/* Ensure header container uses flexbox for proper alignment */
+.site-header .inside-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ibex-header-social__link {
+  align-items: center;
+  color: #ffffff;
+  display: flex;
+  line-height: 1;
+  text-decoration: none;
+  transition: color 200ms ease, transform 200ms ease;
+}
+
+.ibex-header-social__link:hover,
+.ibex-header-social__link:focus {
+  color: #f5a623;
+  transform: scale(1.1);
+}
+
+.ibex-header-social__icon {
+  display: inline-flex;
+  height: 1.5rem;
+  width: 1.5rem;
+}
+
+.ibex-header-social__icon svg {
+  fill: currentColor;
+  height: 100%;
+  width: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ibex-header-social {
+    gap: 0.5rem;
+    margin-right: 0.5rem;
+    margin-left: 0;
+  }
+
+  .ibex-header-social__icon {
+    height: 1.25rem;
+    width: 1.25rem;
+  }
+
+  /* Mobile layout: icons left, logo centered, menu right */
+  .site-header .inside-header {
+    display: grid !important;
+    grid-template-columns: minmax(auto, 1fr) minmax(auto, 1fr) minmax(auto, 1fr) !important;
+    align-items: center !important;
+    width: 100% !important;
+    position: relative !important;
+  }
+
+  /* Icons on the left */
+  .ibex-header-social {
+    grid-column: 1;
+    justify-self: start;
+    z-index: 10;
+    position: relative;
+  }
+
+  /* Logo centered in middle column - always stay in grid */
+  .site-header .site-logo {
+    grid-column: 2;
+    justify-self: center;
+    text-align: center !important;
+    z-index: 10;
+    position: relative;
+  }
+
+  /* Increase logo size on mobile */
+  .site-header .site-logo img.header-image {
+    max-width: 200px !important;
+    height: auto !important;
+  }
+
+  /* Menu button on the right */
+  .main-navigation.mobile-menu-control-wrapper {
+    grid-column: 3;
+    justify-self: end;
+    z-index: 10;
+    position: relative;
+  }
+
+  /* Ensure the navigation menu (when open) doesn't interfere with header grid */
+  .site-header #site-navigation {
+    position: absolute !important;
+    top: calc(100% - 15px) !important;
+    right: 0 !important;
+    width: 50% !important;
+    z-index: 999 !important;
+    grid-column: none !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    padding: 1rem 0 !important;
+  }
+
+  /* Show background when menu is visible - match header background */
+  .site-header #site-navigation[style*="display: block"],
+  .site-header #site-navigation:not([style*="display: none"]):not([style*="display:none"]),
+  .site-header .menu-toggle[aria-expanded="true"] ~ #site-navigation,
+  .site-header #site-navigation.toggled,
+  .site-header #site-navigation[aria-expanded="true"] {
+    background-color: var(--gp-header-background-color, var(--gp-base-color, #222222)) !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* Style the navigation menu container */
+  .site-header #site-navigation .inside-navigation {
+    background-color: transparent !important;
+  }
+}
