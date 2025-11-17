@@ -20,7 +20,23 @@ $team_query   = new WP_Query([
   ],
 ]);
 
+$archive_intro = '';
+$intro_page = apply_filters('ibex_team_archive_intro_page', get_page_by_path('team'));
+
+if ($intro_page instanceof WP_Post) {
+  $raw_intro = $intro_page->post_excerpt ?: $intro_page->post_content;
+  if ($raw_intro) {
+    $archive_intro = apply_filters(
+      'ibex_team_archive_intro_content',
+      wp_kses_post(wpautop($raw_intro))
+    );
+  }
+}
+
 $archive_description = get_the_archive_description();
+if (!$archive_description && $archive_intro) {
+  $archive_description = $archive_intro;
+}
 if (!$archive_description) {
   $archive_description = '<p>' . esc_html__('Drivers, crew, and hospitality experts representing IBEX Racing on and off the circuit.', 'ibex-racing-child') . '</p>';
 }
@@ -36,11 +52,28 @@ $contact_page = get_permalink(get_page_by_path('contact'));
       <div class="ibex-archive-hero__intro">
         <?php echo wp_kses_post($archive_description); ?>
       </div>
-      <?php if ($contact_page) : ?>
+      <?php if ($contact_page || (is_user_logged_in() && current_user_can('edit_posts'))) : ?>
         <div class="ibex-archive-hero__cta">
-          <a class="ibex-button ibex-button--outline" href="<?php echo esc_url($contact_page); ?>">
-            <?php esc_html_e('Connect With Us', 'ibex-racing-child'); ?>
-          </a>
+          <?php if ($contact_page) : ?>
+            <a class="ibex-button ibex-button--outline" href="<?php echo esc_url($contact_page); ?>">
+              <?php esc_html_e('Connect With Us', 'ibex-racing-child'); ?>
+            </a>
+          <?php endif; ?>
+          <?php
+          if (is_user_logged_in() && current_user_can('edit_posts')) {
+            $dashboard_url = function_exists('ibex_get_page_link_by_template')
+              ? ibex_get_page_link_by_template('page-team-dashboard.php')
+              : '';
+
+            if ($dashboard_url) :
+              ?>
+              <a class="ibex-button" href="<?php echo esc_url($dashboard_url); ?>">
+                <?php esc_html_e('Manage Team', 'ibex-racing-child'); ?>
+              </a>
+              <?php
+            endif;
+          }
+          ?>
         </div>
       <?php endif; ?>
     </div>

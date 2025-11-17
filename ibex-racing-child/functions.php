@@ -35,7 +35,7 @@ add_filter('generate_show_title', function($show) {
 // v2025-10-18 — IBEX Racing CPTs (Team, Events, Listings)
 add_action('init', function () {
   register_post_type('team_member', [
-    'label' => 'Team Members','public' => true,'show_in_rest' => true,
+    'label' => 'Why IBEX?','public' => true,'show_in_rest' => true,
     'menu_icon' => 'dashicons-groups','supports' => ['title','editor','thumbnail','excerpt'],
     'has_archive' => true,'rewrite' => ['slug' => 'team']
   ]);
