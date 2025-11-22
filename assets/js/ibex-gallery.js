@@ -77,13 +77,26 @@
     prevButton.hidden = true;
     nextButton.hidden = true;
   } else {
-    prevButton.addEventListener('click', showPrev);
-    nextButton.addEventListener('click', showNext);
+    prevButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showPrev();
+    });
+    nextButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showNext();
+    });
   }
 
-  closeButton.addEventListener('click', closeLightbox);
+  closeButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeLightbox();
+  });
 
   lightbox.addEventListener('click', (event) => {
+    // Only close if clicking directly on the lightbox background, not on buttons or frame
     if (event.target === lightbox) {
       closeLightbox();
     }

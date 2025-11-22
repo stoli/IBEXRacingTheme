@@ -737,6 +737,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .ibex-lightbox__image {
@@ -746,6 +749,9 @@
   max-width: min(90vw, 1200px);
   object-fit: contain;
   width: auto;
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .ibex-lightbox__close,
@@ -763,6 +769,13 @@
   line-height: 1;
   width: clamp(2.5rem, 5vw, 3rem);
   transition: background 200ms ease, color 200ms ease, border-color 200ms ease;
+  position: relative;
+  z-index: 10000;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  touch-action: manipulation;
 }
 
 .ibex-lightbox__close {
