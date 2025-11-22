@@ -104,7 +104,6 @@ $acf_form_args = [
   'return'             => $return_url,
   'field_groups'       => ['group_ibex_media_gallery_details'],
   'post_title'         => true,
-  'post_content'       => true,
   'post_excerpt'       => true,
   'submit_value'       => $submit_label,
   'html_submit_button' => sprintf(
@@ -118,6 +117,13 @@ $acf_form_args = [
     esc_html__('Gallery saved successfully.', 'ibex-racing-child') .
     '</div>',
 ];
+
+// Load current post author into creator field when editing
+if ($view_mode === 'edit' && $gallery_post) {
+  add_filter('acf/load_value/name=media_gallery_author', static function ($value) use ($gallery_post) {
+    return (int) $gallery_post->post_author;
+  });
+}
 
 if ($view_mode !== 'edit' && $related_event_id) {
   $linked_event = get_post($related_event_id);
@@ -148,7 +154,18 @@ $gallery_assets  = 0;
 if ($gallery_post && function_exists('get_field')) {
   $items = get_field('media_gallery_items', $gallery_post->ID);
   if (is_array($items)) {
-    $gallery_assets = count($items);
+    $gallery_assets = 0;
+    foreach ($items as $item) {
+      $layout = $item['acf_fc_layout'] ?? '';
+      if ($layout === 'image_upload') {
+        $image_gallery = $item['image_gallery'] ?? [];
+        if (is_array($image_gallery)) {
+          $gallery_assets += count($image_gallery);
+        }
+      } else {
+        $gallery_assets += 1;
+      }
+    }
   }
 }
 
@@ -178,7 +195,20 @@ $view_link   = $gallery_post ? get_permalink($gallery_post) : '';
           $modified_diff = $modified_time ? human_time_diff($modified_time, current_time('timestamp')) : '';
 
           $item_media    = function_exists('get_field') ? get_field('media_gallery_items', $item_id) : [];
-          $item_assets   = is_array($item_media) ? count($item_media) : 0;
+          $item_assets   = 0;
+          if (is_array($item_media)) {
+            foreach ($item_media as $media_item) {
+              $layout = $media_item['acf_fc_layout'] ?? '';
+              if ($layout === 'image_upload') {
+                $image_gallery = $media_item['image_gallery'] ?? [];
+                if (is_array($image_gallery)) {
+                  $item_assets += count($image_gallery);
+                }
+              } else {
+                $item_assets += 1;
+              }
+            }
+          }
           $item_assets_label = sprintf(
             esc_html(_n('%d asset', '%d assets', $item_assets, 'ibex-racing-child')),
             $item_assets

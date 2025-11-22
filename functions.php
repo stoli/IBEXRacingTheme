@@ -5,7 +5,7 @@ add_action('wp_enqueue_scripts', function() {
   wp_enqueue_style('parent-style', get_template_directory_uri() . '/style.css', [], wp_get_theme(get_template())->get('Version'));
   wp_enqueue_style('ibex-racing-child-style', get_stylesheet_uri(), ['parent-style'], $theme_version);
 
-  if (is_singular('listing')) {
+  if (is_singular('listing') || is_singular('media_gallery')) {
     wp_enqueue_script(
       'ibex-gallery',
       get_stylesheet_directory_uri() . '/assets/js/ibex-gallery.js',
@@ -694,22 +694,24 @@ add_action('acf/init', function () {
         'instructions' => 'Intro paragraph that appears above the gallery grid.',
       ],
       [
+        'key' => 'field_ibex_media_gallery_author',
+        'label' => 'Creator',
+        'name' => 'media_gallery_author',
+        'type' => 'user',
+        'required' => 0,
+        'role' => ['all'],
+        'return_format' => 'id',
+        'allow_null' => 1,
+        'instructions' => 'Select the user who created this gallery. This will be displayed as "Created By" on the gallery page.',
+      ],
+      [
         'key' => 'field_ibex_media_gallery_photographer',
-        'label' => 'Default Photographer Credit',
+        'label' => 'Photographer Credit',
         'name' => 'media_gallery_photographer',
         'type' => 'text',
         'required' => 0,
-        'instructions' => 'Applied to all assets unless a per-item override is set.',
+        'instructions' => 'Credit applied to all images in the gallery.',
         'placeholder' => 'Photo: John Doe',
-      ],
-      [
-        'key' => 'field_ibex_media_gallery_allow_downloads',
-        'label' => 'Allow Downloads',
-        'name' => 'media_gallery_allow_downloads',
-        'type' => 'true_false',
-        'required' => 0,
-        'message' => 'Enable visitors to download gallery assets.',
-        'default_value' => 1,
       ],
       [
         'key' => 'field_ibex_media_gallery_notes',
@@ -733,59 +735,20 @@ add_action('acf/init', function () {
           'layout_ibex_media_gallery_image' => [
             'key' => 'layout_ibex_media_gallery_image',
             'name' => 'image_upload',
-            'label' => 'Image Upload',
+            'label' => 'Image Gallery',
             'display' => 'block',
             'sub_fields' => [
               [
                 'key' => 'field_ibex_media_gallery_image_file',
-                'label' => 'Image',
-                'name' => 'image_file',
-                'type' => 'image',
+                'label' => 'Images',
+                'name' => 'image_gallery',
+                'type' => 'gallery',
                 'required' => 1,
                 'return_format' => 'id',
                 'preview_size' => 'medium',
+                'insert' => 'append',
                 'library' => 'all',
-                'instructions' => 'Upload a JPG or PNG image.',
-              ],
-              [
-                'key' => 'field_ibex_media_gallery_image_caption',
-                'label' => 'Caption',
-                'name' => 'caption',
-                'type' => 'textarea',
-                'rows' => 3,
-                'new_lines' => 'br',
-                'instructions' => 'Optional caption displayed below the image.',
-              ],
-              [
-                'key' => 'field_ibex_media_gallery_image_photographer',
-                'label' => 'Photographer Override',
-                'name' => 'photographer_override',
-                'type' => 'text',
-                'instructions' => 'Leave blank to use the default gallery credit.',
-              ],
-              [
-                'key' => 'field_ibex_media_gallery_image_download',
-                'label' => 'Allow Download',
-                'name' => 'download_allowed',
-                'type' => 'true_false',
-                'default_value' => '',
-                'instructions' => 'Override the gallery-level download setting for this asset.',
-              ],
-              [
-                'key' => 'field_ibex_media_gallery_image_featured',
-                'label' => 'Mark as Featured',
-                'name' => 'is_featured',
-                'type' => 'true_false',
-                'default_value' => 0,
-                'instructions' => 'Optional: use to prioritize this image in custom layouts.',
-              ],
-              [
-                'key' => 'field_ibex_media_gallery_image_display_event',
-                'label' => 'Display on Event Page',
-                'name' => 'display_on_event_page',
-                'type' => 'true_false',
-                'default_value' => 1,
-                'instructions' => 'Uncheck to hide this asset when embedding the gallery on the related event page.',
+                'instructions' => 'Select multiple images at once. Photographer credit applies to all images from the gallery-level field above.',
               ],
             ],
           ],
@@ -830,14 +793,6 @@ add_action('acf/init', function () {
                 'name' => 'photographer_override',
                 'type' => 'text',
                 'instructions' => 'Leave blank to use the default gallery credit.',
-              ],
-              [
-                'key' => 'field_ibex_media_gallery_video_download',
-                'label' => 'Allow Download',
-                'name' => 'download_allowed',
-                'type' => 'true_false',
-                'default_value' => '',
-                'instructions' => 'Override the gallery-level download setting for this asset.',
               ],
               [
                 'key' => 'field_ibex_media_gallery_video_display_event',
@@ -900,14 +855,6 @@ add_action('acf/init', function () {
                 'name' => 'photographer_override',
                 'type' => 'text',
                 'instructions' => 'Leave blank to use the default gallery credit.',
-              ],
-              [
-                'key' => 'field_ibex_media_gallery_embed_download',
-                'label' => 'Allow Download',
-                'name' => 'download_allowed',
-                'type' => 'true_false',
-                'default_value' => 0,
-                'instructions' => 'Typically disabled for external embeds.',
               ],
               [
                 'key' => 'field_ibex_media_gallery_embed_display_event',
@@ -1187,14 +1134,22 @@ function ibex_get_gallery_preview_items(int $gallery_id, int $limit = 4): array
     }
 
     if ($layout === 'image_upload') {
-      $image_id = $item['image_file'] ?? 0;
-      if ($image_id) {
-        $preview[] = [
-          'type'    => 'image',
-          'image'   => wp_get_attachment_image_url($image_id, 'medium_large'),
-          'alt'     => trim((string) get_post_meta($image_id, '_wp_attachment_image_alt', true)) ?: get_the_title($image_id),
-          'caption' => $item['caption'] ?? '',
-        ];
+      $image_gallery = $item['image_gallery'] ?? [];
+      if (is_array($image_gallery) && !empty($image_gallery)) {
+        foreach ($image_gallery as $image_id) {
+          if (!$image_id) {
+            continue;
+          }
+          $preview[] = [
+            'type'    => 'image',
+            'image'   => wp_get_attachment_image_url((int) $image_id, 'medium_large'),
+            'alt'     => trim((string) get_post_meta((int) $image_id, '_wp_attachment_image_alt', true)) ?: get_the_title((int) $image_id),
+            'caption' => '',
+          ];
+          if (count($preview) >= $limit) {
+            break 2;
+          }
+        }
       }
       continue;
     }
@@ -1542,6 +1497,29 @@ add_action('acf/save_post', function ($post_id) {
     return;
   }
 
+  // Update post author if creator field is set
+  // Check POST data first (during save), then fallback to get_field
+  $creator_id = null;
+  if (isset($_POST['acf']['field_ibex_media_gallery_author'])) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+    $creator_id = (int) $_POST['acf']['field_ibex_media_gallery_author']; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+  } else {
+    $creator_id = get_field('media_gallery_author', $post_id);
+    if ($creator_id) {
+      $creator_id = (int) $creator_id;
+    }
+  }
+
+  if ($creator_id && $creator_id > 0) {
+    // Only update if user exists and current user has permission
+    $user = get_userdata($creator_id);
+    if ($user && (current_user_can('edit_others_media_galleries') || current_user_can('manage_options'))) {
+      wp_update_post([
+        'ID' => $post_id,
+        'post_author' => $creator_id,
+      ]);
+    }
+  }
+
   $cover_image_id = get_field('media_gallery_cover_image', $post_id);
   if ($cover_image_id) {
     set_post_thumbnail($post_id, (int) $cover_image_id);
@@ -1612,4 +1590,182 @@ function ibex_render_header_social_icons(): void
 // Add social icons in a vertical stack to the left of the logo
 // Using generate_before_logo hook to place icons before the logo
 add_action('generate_before_logo', 'ibex_render_header_social_icons', 15);
+
+// v2025-01-XX — Frontend-only login redirects
+/**
+ * Redirect all logins to the frontend instead of wp-admin.
+ * This keeps users on the site and shields them from the WordPress backend.
+ */
+add_filter('login_redirect', function ($redirect_to, $requested_redirect_to, $user) {
+  // If a specific redirect was requested and it's safe, use it
+  if ($requested_redirect_to && filter_var($requested_redirect_to, FILTER_VALIDATE_URL)) {
+    $parsed = wp_parse_url($requested_redirect_to);
+    // Allow frontend redirects only (not wp-admin)
+    if (!empty($parsed['path']) && strpos($parsed['path'], '/wp-admin') === false) {
+      return esc_url_raw($requested_redirect_to);
+    }
+  }
+
+  // Default: redirect to homepage (or first dashboard section if available)
+  $dashboard_url = ibex_get_page_link_by_template('page-media-gallery-dashboard.php');
+  if ($dashboard_url && is_user_logged_in()) {
+    // Check if user has access to at least one dashboard section
+    $sections = ibex_get_dashboard_sections();
+    if (!empty($sections)) {
+      return esc_url_raw(reset($sections)['url']);
+    }
+  }
+
+  return home_url('/');
+}, 10, 3);
+
+/**
+ * Block non-administrators from accessing wp-admin entirely.
+ * Administrators can still access the backend when needed.
+ */
+add_action('admin_init', function () {
+  // Allow administrators full access
+  if (current_user_can('manage_options')) {
+    return;
+  }
+
+  // Allow AJAX requests to pass through (needed for frontend functionality)
+  if (wp_doing_ajax()) {
+    return;
+  }
+
+  // Redirect everyone else to the homepage
+  wp_safe_redirect(home_url('/'));
+  exit;
+}, 1);
+
+/**
+ * Redirect the default WordPress login URL (wp-login.php) to the custom login page.
+ * This ensures users always use the branded frontend login experience.
+ */
+add_filter('login_url', function ($login_url, $redirect) {
+  $login_page = ibex_get_page_link_by_template('page-login.php');
+  
+  if ($login_page) {
+    $login_url = $login_page;
+    
+    // Append redirect parameter if provided
+    if ($redirect) {
+      $login_url = add_query_arg('redirect_to', urlencode($redirect), $login_url);
+    }
+  }
+  
+  return $login_url;
+}, 10, 2);
+
+/**
+ * Redirect password reset/lost password URLs to the frontend login page.
+ * This keeps password reset flows on the frontend.
+ */
+add_filter('lostpassword_url', function ($lostpassword_url, $redirect) {
+  $login_page = ibex_get_page_link_by_template('page-login.php');
+  
+  if ($login_page) {
+    $lostpassword_url = add_query_arg('action', 'lostpassword', $login_page);
+    
+    if ($redirect) {
+      $lostpassword_url = add_query_arg('redirect_to', urlencode($redirect), $lostpassword_url);
+    }
+  }
+  
+  return $lostpassword_url;
+}, 10, 2);
+
+/**
+ * Modify password reset email links to point to the frontend login page.
+ * When users click "Reset Password" in emails, they'll go to your custom login page.
+ */
+add_filter('retrieve_password_message', function ($message, $key, $user_login, $user_data) {
+  $login_page = ibex_get_page_link_by_template('page-login.php');
+  
+  if ($login_page) {
+    // Build reset link pointing to frontend login page
+    $reset_link = add_query_arg(
+      [
+        'action'     => 'rp',
+        'key'        => $key,
+        'login'      => rawurlencode($user_login),
+      ],
+      $login_page
+    );
+    
+    // Replace the default wp-login.php reset link with frontend link
+    $message = str_replace(
+      network_site_url("wp-login.php?action=rp&key=$key&login=" . rawurlencode($user_login)),
+      $reset_link,
+      $message
+    );
+  }
+  
+  return $message;
+}, 10, 4);
+
+/**
+ * Redirect users after successful password reset to the frontend (not wp-admin).
+ * This completes the frontend-only login experience.
+ */
+add_filter('password_reset_redirect', function ($redirect_to, $requested_redirect_to) {
+  // If a frontend redirect was requested, use it
+  if ($requested_redirect_to && filter_var($requested_redirect_to, FILTER_VALIDATE_URL)) {
+    $parsed = wp_parse_url($requested_redirect_to);
+    if (!empty($parsed['path']) && strpos($parsed['path'], '/wp-admin') === false) {
+      return esc_url_raw($requested_redirect_to);
+    }
+  }
+  
+  // Default: redirect to login page with success message
+  $login_page = ibex_get_page_link_by_template('page-login.php');
+  if ($login_page) {
+    return add_query_arg('password-reset', 'success', $login_page);
+  }
+  
+  return home_url('/');
+}, 10, 2);
+
+/**
+ * Customize new user welcome emails to use frontend login/reset links.
+ * When you create users in WP Admin, their welcome emails will point to the frontend.
+ */
+add_filter('wp_new_user_notification_email', function ($wp_new_user_notification_email, $user, $blogname) {
+  $login_page = ibex_get_page_link_by_template('page-login.php');
+  
+  if ($login_page && isset($wp_new_user_notification_email['message'])) {
+    // Generate a password reset key for the new user
+    $key = get_password_reset_key($user);
+    if (!is_wp_error($key)) {
+      $reset_link = add_query_arg(
+        [
+          'action' => 'rp',
+          'key'    => $key,
+          'login'  => rawurlencode($user->user_login),
+        ],
+        $login_page
+      );
+      
+      // Replace wp-login.php links with frontend login page links
+      $wp_new_user_notification_email['message'] = str_replace(
+        network_site_url('wp-login.php'),
+        $login_page,
+        $wp_new_user_notification_email['message']
+      );
+      
+      // Replace password reset links with frontend version
+      if (strpos($wp_new_user_notification_email['message'], 'wp-login.php?action=rp') !== false) {
+        $old_reset_pattern = network_site_url('wp-login.php?action=rp');
+        $wp_new_user_notification_email['message'] = preg_replace(
+          '#(' . preg_quote($old_reset_pattern, '#') . '[^\s<>"\']+)#',
+          $reset_link,
+          $wp_new_user_notification_email['message']
+        );
+      }
+    }
+  }
+  
+  return $wp_new_user_notification_email;
+}, 10, 3);
 

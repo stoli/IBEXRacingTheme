@@ -16,6 +16,9 @@ get_header();
 
       $gallery_id = get_the_ID();
       $cover_image = has_post_thumbnail($gallery_id) ? get_the_post_thumbnail_url($gallery_id, 'full') : '';
+      $gallery_author_id = (int) get_post_field('post_author', $gallery_id);
+      $gallery_author = $gallery_author_id ? get_userdata($gallery_author_id) : null;
+      $gallery_author_name = $gallery_author ? $gallery_author->display_name : '';
 
       $get_field_safe = static function (string $field, $format_value = true) use ($gallery_id) {
         if (function_exists('get_field')) {
@@ -30,8 +33,7 @@ get_header();
       $end_date            = $get_field_safe('media_gallery_end_date');
       $location            = $get_field_safe('media_gallery_location');
       $overview            = $get_field_safe('media_gallery_overview');
-      $default_photographer = $get_field_safe('media_gallery_photographer');
-      $allow_downloads     = (bool) $get_field_safe('media_gallery_allow_downloads');
+      $gallery_photographer = $get_field_safe('media_gallery_photographer');
       $media_items_raw     = $get_field_safe('media_gallery_items') ?: [];
       $related_event_id    = (int) $get_field_safe('media_gallery_related_event');
       $date_label          = function_exists('ibex_format_date_range')
@@ -42,45 +44,44 @@ get_header();
       $related_event_title = $related_event_id ? get_the_title($related_event_id) : '';
 
       $archive_link  = get_post_type_archive_link('media_gallery');
-      $asset_counter = is_array($media_items_raw) ? count($media_items_raw) : 0;
 
       $prepared_items = [];
 
       if (is_array($media_items_raw)) {
         foreach ($media_items_raw as $index => $item) {
           $layout = $item['acf_fc_layout'] ?? '';
-          $caption = $item['caption'] ?? '';
-          $caption_html = $caption ? wpautop($caption) : '';
-          $credit = !empty($item['photographer_override']) ? $item['photographer_override'] : $default_photographer;
-
-          $download_allowed = $allow_downloads;
-          if (array_key_exists('download_allowed', $item) && $item['download_allowed'] !== '') {
-            $download_allowed = (bool) $item['download_allowed'];
-          }
 
           if ($layout === 'image_upload') {
-            $image_id = $item['image_file'] ?? 0;
-            if (!$image_id) {
+            $image_gallery = $item['image_gallery'] ?? [];
+            if (!is_array($image_gallery) || empty($image_gallery)) {
               continue;
             }
 
-            $thumb_html = wp_get_attachment_image($image_id, 'large', false, [
-              'class'   => 'ibex-media-gallery__image',
-              'loading' => 'lazy',
-            ]);
-            $full_url  = wp_get_attachment_url($image_id) ?: '';
+            // Loop through all images in the gallery
+            foreach ($image_gallery as $image_id) {
+              if (!$image_id) {
+                continue;
+              }
 
-            $prepared_items[] = [
-              'type'             => 'image',
-              'media'            => $thumb_html,
-              'full_url'         => $full_url,
-              'caption'          => $caption_html,
-              'credit'           => $credit,
-              'download_allowed' => $download_allowed && $full_url,
-              'download_name'    => $full_url ? basename($full_url) : '',
-            ];
-            if (!$cover_image && $image_id) {
-              $cover_image = wp_get_attachment_image_url($image_id, 'full');
+              $thumb_html = wp_get_attachment_image((int) $image_id, 'large', false, [
+                'class'   => 'ibex-media-gallery__image',
+                'loading' => 'lazy',
+              ]);
+              $full_url  = wp_get_attachment_url((int) $image_id) ?: '';
+              $alt_text  = get_post_meta((int) $image_id, '_wp_attachment_image_alt', true) ?: get_the_title((int) $image_id);
+
+              $prepared_items[] = [
+                'type'             => 'image',
+                'media'            => $thumb_html,
+                'full_url'         => $full_url,
+                'image_id'         => (int) $image_id,
+                'alt_text'         => $alt_text,
+                'caption'          => '',
+                'credit'           => $gallery_photographer,
+              ];
+              if (!$cover_image && $image_id) {
+                $cover_image = wp_get_attachment_image_url((int) $image_id, 'full');
+              }
             }
             continue;
           }
@@ -96,6 +97,11 @@ get_header();
             $poster_id  = $item['poster_image'] ?? 0;
             $poster_url = $poster_id ? wp_get_attachment_image_url($poster_id, 'large') : '';
 
+            // Use per-item caption if set
+            $video_caption = !empty($item['caption']) ? wpautop($item['caption']) : '';
+            // Use per-item photographer if set, otherwise use gallery-level
+            $video_credit = !empty($item['photographer_override']) ? $item['photographer_override'] : $gallery_photographer;
+
             $video_html = wp_video_shortcode(array_filter([
               'src'    => $video_url,
               'poster' => $poster_url,
@@ -105,10 +111,8 @@ get_header();
               'type'             => 'video',
               'media'            => $video_html,
               'full_url'         => $video_url,
-              'caption'          => $caption_html,
-              'credit'           => $credit,
-              'download_allowed' => $download_allowed && $video_url,
-              'download_name'    => $video_url ? basename($video_url) : '',
+              'caption'          => $video_caption,
+              'credit'           => $video_credit,
             ];
             if (!$cover_image && $poster_url) {
               $cover_image = $poster_url;
@@ -166,6 +170,11 @@ get_header();
               $full_url = $embed_url;
             }
 
+            // Use per-item caption if set
+            $embed_caption = !empty($item['caption']) ? wpautop($item['caption']) : '';
+            // Use per-item photographer if set, otherwise use gallery-level
+            $embed_credit = !empty($item['photographer_override']) ? $item['photographer_override'] : $gallery_photographer;
+
             $prepared_items[] = [
               'type'             => 'embed',
               'media'            => sprintf(
@@ -173,9 +182,8 @@ get_header();
                 trim($embed_html)
               ),
               'full_url'         => $full_url,
-              'caption'          => $caption_html,
-              'credit'           => $credit,
-              'download_allowed' => false,
+              'caption'          => $embed_caption,
+              'credit'           => $embed_credit,
               'provider'         => $item['embed_provider'] ?? 'other',
             ];
             if (!$cover_image && !empty($item['thumbnail_image'])) {
@@ -194,6 +202,9 @@ get_header();
           }
         }
       }
+
+      // Count actual assets (individual images, videos, embeds)
+      $asset_counter = count($prepared_items);
       ?>
 
       <article id="post-<?php the_ID(); ?>" <?php post_class('ibex-media-gallery__article'); ?>>
@@ -228,6 +239,12 @@ get_header();
                   ?>
                 </span>
               </li>
+              <?php if ($gallery_author_name) : ?>
+                <li>
+                  <span class="ibex-media-gallery__meta-label"><?php esc_html_e('Created By', 'ibex-racing-child'); ?></span>
+                  <span class="ibex-media-gallery__meta-value"><?php echo esc_html($gallery_author_name); ?></span>
+                </li>
+              <?php endif; ?>
             </ul>
 
             <div class="ibex-media-gallery__hero-actions">
@@ -271,11 +288,15 @@ get_header();
                       <?php
                       if ($media['type'] === 'image') {
                         if (!empty($media['full_url'])) {
+                          $aria_label = !empty($media['alt_text']) 
+                            ? sprintf(__('View image: %s', 'ibex-racing-child'), esc_attr($media['alt_text']))
+                            : __('View image in gallery', 'ibex-racing-child');
                           printf(
-                            '<a href="%1$s" class="ibex-media-gallery__media-link"%2$s>%3$s</a>',
+                            '<a href="%1$s" class="ibex-media-gallery__media-link" data-ibex-gallery aria-label="%4$s">%3$s</a>',
                             esc_url($media['full_url']),
-                            $media['download_allowed'] ? ' download="' . esc_attr($media['download_name']) . '"' : '',
-                            $media['media']
+                            '',
+                            $media['media'],
+                            $aria_label
                           );
                         } else {
                           echo $media['media']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
@@ -287,30 +308,30 @@ get_header();
                       }
                       ?>
                     </div>
-                    <?php if (!empty($media['caption']) || !empty($media['credit']) || !empty($media['download_allowed'])) : ?>
+                    <?php if (!empty($media['caption']) || ($media['type'] !== 'image' && !empty($media['credit']))) : ?>
                       <figcaption class="ibex-media-gallery__meta-block">
                         <?php if (!empty($media['caption'])) : ?>
                           <div class="ibex-media-gallery__caption">
                             <?php echo wp_kses_post($media['caption']); ?>
                           </div>
                         <?php endif; ?>
-                        <div class="ibex-media-gallery__meta-footer">
-                          <?php if (!empty($media['credit'])) : ?>
+                        <?php if ($media['type'] !== 'image' && !empty($media['credit'])) : ?>
+                          <div class="ibex-media-gallery__meta-footer">
                             <span class="ibex-media-gallery__credit">
                               <?php echo esc_html($media['credit']); ?>
                             </span>
-                          <?php endif; ?>
-                          <?php if (!empty($media['download_allowed']) && !empty($media['full_url'])) : ?>
-                            <a class="ibex-media-gallery__download" href="<?php echo esc_url($media['full_url']); ?>" download="<?php echo esc_attr($media['download_name']); ?>">
-                              <?php esc_html_e('Download', 'ibex-racing-child'); ?>
-                            </a>
-                          <?php endif; ?>
-                        </div>
+                          </div>
+                        <?php endif; ?>
                       </figcaption>
                     <?php endif; ?>
                   </figure>
                 <?php endforeach; ?>
               </div>
+              <?php if (!empty($gallery_photographer)) : ?>
+                <div class="ibex-media-gallery__credit">
+                  <?php echo esc_html($gallery_photographer); ?>
+                </div>
+              <?php endif; ?>
             </section>
           <?php else : ?>
             <p class="ibex-media-gallery__empty">
