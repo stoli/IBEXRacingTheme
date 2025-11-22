@@ -2,19 +2,62 @@
 // v2025-10-18 — enqueue parent theme styles
 add_action('wp_enqueue_scripts', function() {
   $theme_version = wp_get_theme()->get('Version');
+  $stylesheet_dir = get_stylesheet_directory_uri();
+  $stylesheet_path = get_stylesheet_directory();
+  
+  // Enqueue parent theme style
   wp_enqueue_style('parent-style', get_template_directory_uri() . '/style.css', [], wp_get_theme(get_template())->get('Version'));
-  wp_enqueue_style('ibex-racing-child-style', get_stylesheet_uri(), ['parent-style'], $theme_version);
+  
+  // Enqueue child theme style with explicit path verification
+  $child_style_path = $stylesheet_path . '/style.css';
+  
+  // Always try to enqueue - WordPress should handle errors gracefully
+  // But use explicit URL construction to avoid path issues
+  $theme_slug = get_stylesheet(); // Gets the actual theme directory name
+  $child_style_url = content_url('themes/' . $theme_slug . '/style.css');
+  
+  // Get version from file if it exists, otherwise use theme version
+  $child_style_version = $theme_version;
+  if (file_exists($child_style_path) && is_readable($child_style_path)) {
+    $child_style_version = filemtime($child_style_path);
+  }
+  
+  // Ensure URL doesn't have double slashes and is properly formatted
+  $child_style_url = str_replace(['/./', '//'], '/', $child_style_url);
+  $child_style_url = preg_replace('#([^:])//+#', '$1/', $child_style_url);
+  
+  wp_enqueue_style(
+    'ibex-racing-child-style',
+    $child_style_url,
+    ['parent-style'],
+    $child_style_version
+  );
 
   if (is_singular('listing') || is_singular('media_gallery')) {
+    // Use explicit URL construction to avoid path issues
+    $theme_slug = get_stylesheet();
+    $gallery_js_url = content_url('themes/' . $theme_slug . '/assets/js/ibex-gallery.js');
+    
+    // Get version from file if it exists, otherwise use theme version
+    $gallery_js_path = $stylesheet_path . '/assets/js/ibex-gallery.js';
+    $gallery_js_version = $theme_version;
+    if (file_exists($gallery_js_path) && is_readable($gallery_js_path)) {
+      $gallery_js_version = filemtime($gallery_js_path);
+    }
+    
+    // Ensure URL doesn't have double slashes and is properly formatted
+    $gallery_js_url = str_replace(['/./', '//'], '/', $gallery_js_url);
+    $gallery_js_url = preg_replace('#([^:])//+#', '$1/', $gallery_js_url);
+    
     wp_enqueue_script(
       'ibex-gallery',
-      get_stylesheet_directory_uri() . '/assets/js/ibex-gallery.js',
+      $gallery_js_url,
       [],
-      $theme_version,
+      $gallery_js_version,
       true
     );
   }
-});
+}, 10);
 
 // Disable GeneratePress entry header for pages (we use custom hero layout)
 add_filter('generate_show_entry_header', function($show) {
@@ -316,24 +359,39 @@ add_action('init', function () {
 }, 20);
 // v2025-11-11 — Restrict deletions to authors or admins for events/galleries
 add_filter('map_meta_cap', function (array $caps, string $cap, int $user_id, array $args) {
-  if ($cap !== 'delete_post' || empty($args[0])) {
-    return $caps;
+  // Handle delete_post capability
+  if ($cap === 'delete_post' && !empty($args[0])) {
+    $post = get_post((int) $args[0]);
+    if ($post && in_array($post->post_type, ['race_event','media_gallery'], true)) {
+      if ((int) $post->post_author === $user_id) {
+        return ['delete_posts'];
+      }
+
+      if (user_can($user_id, 'manage_options')) {
+        return ['delete_others_posts'];
+      }
+
+      return ['do_not_allow'];
+    }
   }
 
-  $post = get_post((int) $args[0]);
-  if (!$post || !in_array($post->post_type, ['race_event','media_gallery'], true)) {
-    return $caps;
+  // Handle edit_post capability for media_gallery to allow admins to attach files
+  if ($cap === 'edit_post' && !empty($args[0])) {
+    $post = get_post((int) $args[0]);
+    if ($post && $post->post_type === 'media_gallery') {
+      // If user is the author, they can edit
+      if ((int) $post->post_author === $user_id) {
+        return ['edit_media_galleries'];
+      }
+
+      // Admins can always edit (and thus attach files to) any media gallery
+      if (user_can($user_id, 'manage_options') || user_can($user_id, 'edit_others_media_galleries')) {
+        return ['edit_others_media_galleries'];
+      }
+    }
   }
 
-  if ((int) $post->post_author === $user_id) {
-    return ['delete_posts'];
-  }
-
-  if (user_can($user_id, 'manage_options')) {
-    return ['delete_others_posts'];
-  }
-
-  return ['do_not_allow'];
+  return $caps;
 }, 10, 4);
 // v2025-11-09 — Strip archive prefixes from titles
 add_filter('get_the_archive_title', function ($title) {
