@@ -230,7 +230,11 @@ if (have_posts()) {
             <p><?php esc_html_e('Join our paddock list for hospitality updates, ticket drops, and activation invites.', 'ibex-racing-child'); ?></p>
             <?php
             $event_title = get_the_title();
-            $email_subject = sprintf('[%s] information', $event_title);
+            // Decode HTML entities and clean up the title
+            $event_title = html_entity_decode($event_title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            // Remove extra whitespace
+            $event_title = trim(preg_replace('/\s+/', ' ', $event_title));
+            $email_subject = sprintf('%s information', $event_title);
             $mailto_url = 'mailto:info@ibexracing.com?subject=' . rawurlencode($email_subject);
             ?>
             <a class="ibex-event-single__cta ibex-event-single__cta--outline" href="<?php echo esc_url($mailto_url); ?>">
