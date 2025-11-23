@@ -62,7 +62,19 @@ if (have_posts()) {
 
     $status_label = '';
     $today        = current_time('Y-m-d');
+    
+    // Determine if event is past
+    $is_past = false;
+    if ($end_date) {
+      // If end_date exists, event is past if end_date is before today
+      $is_past = ($end_date < $today);
+    } elseif ($start_date) {
+      // If only start_date exists, event is past if start_date is before today
+      $is_past = ($start_date < $today);
+    }
+    // If no dates exist, assume event is not past (show registration button)
 
+    // Determine status label
     if ($start_date && $start_date > $today) {
       $status_label = __('Upcoming', 'ibex-racing-child');
     } elseif ($end_date && $end_date >= $today) {
@@ -169,7 +181,7 @@ if (have_posts()) {
             <a class="ibex-event-single__cta ibex-event-single__cta--primary" href="#event-details">
               <?php esc_html_e('Event Details', 'ibex-racing-child'); ?>
             </a>
-            <?php if ($registration) : ?>
+            <?php if ($registration && !$is_past) : ?>
               <a class="ibex-event-single__cta ibex-event-single__cta--accent" href="<?php echo esc_url($registration); ?>" target="_blank" rel="noopener">
                 <?php echo esc_html($registration_label); ?>
               </a>
@@ -206,7 +218,7 @@ if (have_posts()) {
                 </li>
               <?php endif; ?>
             </ul>
-            <?php if ($registration) : ?>
+            <?php if ($registration && !$is_past) : ?>
               <a class="ibex-event-single__cta ibex-event-single__cta--accent" href="<?php echo esc_url($registration); ?>" target="_blank" rel="noopener">
                 <?php echo esc_html($registration_label); ?>
               </a>
@@ -216,7 +228,12 @@ if (have_posts()) {
           <div class="ibex-event-single__sidebar-card ibex-event-single__sidebar-card--secondary">
             <h2><?php esc_html_e('Stay in the Loop', 'ibex-racing-child'); ?></h2>
             <p><?php esc_html_e('Join our paddock list for hospitality updates, ticket drops, and activation invites.', 'ibex-racing-child'); ?></p>
-            <a class="ibex-event-single__cta ibex-event-single__cta--outline" href="<?php echo esc_url(home_url('/contact')); ?>">
+            <?php
+            $event_title = get_the_title();
+            $email_subject = sprintf('[%s] information', $event_title);
+            $mailto_url = 'mailto:info@ibexracing.com?subject=' . rawurlencode($email_subject);
+            ?>
+            <a class="ibex-event-single__cta ibex-event-single__cta--outline" href="<?php echo esc_url($mailto_url); ?>">
               <?php esc_html_e('Contact Us', 'ibex-racing-child'); ?>
             </a>
           </div>
