@@ -3906,7 +3906,7 @@ body.ibex-lightbox-open {
 .ibex-home-layout {
   display: grid;
   gap: clamp(1.25rem, 3vw, 1.75rem); /* Match ibex-archive-section gap */
-  margin: clamp(1.25rem, 3vw, 1.75rem) auto 0; /* Increased margin after hero to create separation */
+  margin: clamp(0.5rem, 2vw, 1.25rem) auto 0; /* Match hero top margin for consistent vertical spacing */
   max-width: 80rem;
   padding: 0; /* Remove side padding to match hero section width exactly */
   width: min(100%, 80rem); /* Match hero section width */
@@ -4082,7 +4082,7 @@ body.ibex-lightbox-open {
 }
 
 .ibex-home-sidebar-card--team .ibex-home-sidebar-card__content {
-  padding-top: clamp(1rem, 2.5vw, 1.5rem); /* Add top padding to prevent text clipping from border-radius */
+  padding: clamp(1rem, 2.5vw, 1.5rem) clamp(0.5rem, 1.5vw, 0.75rem); /* Top/bottom: prevents clipping, left/right: matches other sidebar cards */
 }
 
 .ibex-home-sidebar-card__header {
@@ -4205,7 +4205,7 @@ body.ibex-lightbox-open {
   .ibex-home-layout {
     padding: 0; /* No padding - sections handle their own spacing */
     grid-template-columns: 1fr; /* Single column on mobile */
-    margin: clamp(1.25rem, 3vw, 1.75rem) auto 0; /* Restore margin for spacing */
+    margin: clamp(0.5rem, 2vw, 1.25rem) auto 0; /* Match hero top margin for consistent vertical spacing */
     max-width: 100%; /* Full width on mobile */
   }
 
