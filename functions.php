@@ -717,8 +717,19 @@ add_action('acf/init', function () {
         'name' => 'team_member_tiktok',
         'type' => 'url',
         'required' => 0,
-        'instructions' => 'Optional link to the team member’s TikTok profile.',
+        'instructions' => 'Optional link to the team member\'s TikTok profile.',
         'placeholder' => 'https://www.tiktok.com/@username',
+      ],
+      [
+        'key' => 'field_ibex_team_member_linked_user',
+        'label' => 'Linked User Account',
+        'name' => 'team_member_linked_user',
+        'type' => 'user',
+        'required' => 0,
+        'role' => ['all'],
+        'return_format' => 'id',
+        'allow_null' => 1,
+        'instructions' => 'Link this profile to a WordPress user account. The selected user will be able to edit their own profile. (Admin only)',
       ],
     ],
     'location' => [
@@ -1981,6 +1992,54 @@ add_action('acf/save_post', function ($post_id) {
   }
 }, 30); // Run after other save_post hooks
 
+// Update team member post author when linked user is set (admin only)
+add_action('acf/save_post', function ($post_id) {
+  if (wp_is_post_autosave($post_id) || wp_is_post_revision($post_id)) {
+    return;
+  }
+
+  $post = get_post($post_id);
+  if (!$post || $post->post_type !== 'team_member') {
+    return;
+  }
+
+  // Only allow admins to update the linked user
+  if (!current_user_can('manage_options')) {
+    return;
+  }
+
+  // Update post author if linked user field is set
+  // Check POST data first (during save), then fallback to get_field
+  $linked_user_id = null;
+  if (isset($_POST['acf']['field_ibex_team_member_linked_user'])) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+    $linked_user_id = (int) $_POST['acf']['field_ibex_team_member_linked_user']; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+  } else {
+    $linked_user_id = get_field('team_member_linked_user', $post_id);
+    if ($linked_user_id) {
+      $linked_user_id = (int) $linked_user_id;
+    }
+  }
+
+  if ($linked_user_id && $linked_user_id > 0) {
+    // Only update if user exists
+    $user = get_userdata($linked_user_id);
+    if ($user) {
+      wp_update_post([
+        'ID' => $post_id,
+        'post_author' => $linked_user_id,
+      ]);
+    }
+  }
+}, 25); // Run before FileBird folder creation hook
+
+// Hide team member linked user field from non-admin users
+add_filter('acf/prepare_field/name=team_member_linked_user', function ($field) {
+  if (!current_user_can('manage_options')) {
+    return false; // Hide the field
+  }
+  return $field;
+});
+
 // Filter ACF media library to default to the relevant folder
 add_filter('acf/fields/gallery/query', function ($args, $field, $post_id) {
   // Only filter for media gallery items field
@@ -2380,4 +2439,39 @@ add_filter('wp_new_user_notification_email', function ($wp_new_user_notification
 add_filter('generate_copyright', function($copyright) {
   return '© 2025 IBEX Racing • Built by JViBe.ai';
 });
+
+// v2025-01-XX — Hide WordPress admin bar for all users
+add_filter('show_admin_bar', '__return_false');
+
+// v2025-01-XX — Change login to logout in navigation menu when user is logged in
+add_filter('wp_nav_menu_items', function($items, $args) {
+  if (is_user_logged_in()) {
+    // Replace login link with logout link
+    $login_page = ibex_get_page_link_by_template('page-login.php');
+    $logout_url = wp_logout_url(home_url('/'));
+    
+    // Find and replace login menu items (case-insensitive)
+    if ($login_page) {
+      $login_url_escaped = esc_url($login_page);
+      $items = preg_replace(
+        '/href=["\']' . preg_quote($login_url_escaped, '/') . '["\']/i',
+        'href="' . esc_url($logout_url) . '"',
+        $items
+      );
+      
+      // Replace various login text variations with "Logout" (case-insensitive)
+      $items = preg_replace(
+        '/>([^<]*login[^<]*)</i',
+        '>Logout<',
+        $items
+      );
+      $items = preg_replace(
+        '/>([^<]*sign in[^<]*)</i',
+        '>Logout<',
+        $items
+      );
+    }
+  }
+  return $items;
+}, 10, 2);
 

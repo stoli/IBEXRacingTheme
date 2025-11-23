@@ -333,12 +333,13 @@ $sidebar_cards = apply_filters(
 ?>
 
 <main id="primary" class="site-main ibex-home">
-  <section class="ibex-home-hero" style="<?php echo $hero_background_url ? 'background-image: url(' . esc_url($hero_background_url) . ');' : ''; ?>">
+  <section class="ibex-home-hero"<?php echo $hero_background_url ? ' style="--hero-bg-image: url(' . esc_url($hero_background_url) . ');"' : ''; ?>>
     <div class="ibex-home-hero__overlay"></div>
     <div class="ibex-home-hero__content">
       <span class="ibex-home-hero__eyebrow"><?php esc_html_e('Motorsport Hospitality & Competition', 'ibex-racing-child'); ?></span>
       <h1 class="ibex-home-hero__title"><?php echo esc_html($hero_title); ?></h1>
       <p class="ibex-home-hero__subtitle"><?php echo esc_html($hero_subtitle ?: __('Track experiences and winning pedigree for friends, family, and guests.', 'ibex-racing-child')); ?></p>
+      <?php /* Commented out buttons - may add back later
       <div class="ibex-home-hero__cta-group">
         <?php if (!empty($hero_primary_cta['url'])) : ?>
           <a class="ibex-home-hero__cta ibex-home-hero__cta--primary" href="<?php echo esc_url($hero_primary_cta['url']); ?>">
@@ -351,11 +352,12 @@ $sidebar_cards = apply_filters(
           </a>
         <?php endif; ?>
       </div>
+      */ ?>
     </div>
   </section>
 
   <div class="ibex-home-layout">
-    <section class="ibex-home-primary">
+    <section class="ibex-archive-section ibex-home-primary">
       <div class="ibex-home-primary__header">
         <h2><?php esc_html_e('Photo Gallery', 'ibex-racing-child'); ?></h2>
         <a class="ibex-home-primary__archive-link" href="<?php echo esc_url(get_post_type_archive_link('media_gallery')); ?>">
@@ -404,7 +406,7 @@ $sidebar_cards = apply_filters(
     </section>
 
     <?php if ($sidebar_cards) : ?>
-      <aside class="ibex-home-sidebar" aria-label="<?php esc_attr_e('Featured content', 'ibex-racing-child'); ?>">
+      <aside class="ibex-archive-section ibex-home-sidebar" aria-label="<?php esc_attr_e('Featured content', 'ibex-racing-child'); ?>">
         <?php foreach ($sidebar_cards as $card) : ?>
           <?php if ($card['type'] === 'event' && !empty($card['event'])) : ?>
             <?php

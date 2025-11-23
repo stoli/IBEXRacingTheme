@@ -2749,6 +2749,43 @@ body.ibex-lightbox-open {
   background: transparent !important;
 }
 
+/* Team Dashboard Select2 dropdown styles */
+.page-template-page-team-dashboard .select2-dropdown,
+.page-template-page-team-dashboard .select2-container--default .select2-results__option,
+.page-template-page-team-dashboard .select2-container--default .select2-results__option--highlighted,
+.page-template-page-team-dashboard .select2-container--default .select2-results__option--selected,
+.page-template-page-team-dashboard .select2-results__message,
+.page-template-page-team-dashboard .select2-container--open .select2-selection--single,
+.page-template-page-team-dashboard .select2-container--open .select2-selection--multiple {
+  background: #0f1520;
+  color: rgba(240, 243, 245, 0.9);
+}
+
+.page-template-page-team-dashboard .select2-container--default .select2-results__option--highlighted {
+  background: rgba(245, 166, 35, 0.2) !important;
+  color: #fefefe !important;
+}
+
+.page-template-page-team-dashboard .select2-container--default .select2-results__option[aria-selected="true"] {
+  background: rgba(245, 166, 35, 0.24) !important;
+  color: rgba(15, 21, 32, 0.95) !important;
+}
+
+.page-template-page-team-dashboard .select2-container--default .select2-results__option--highlighted[aria-selected=true] {
+  background: rgba(245, 166, 35, 0.32) !important;
+  color: #0f1520 !important;
+}
+
+.page-template-page-team-dashboard .select2-container--default .select2-results__option--selected {
+  background: rgba(245, 166, 35, 0.24) !important;
+  color: rgba(15, 21, 32, 0.95) !important;
+}
+
+.page-template-page-team-dashboard .select2-container--default .select2-results__option[aria-disabled=true] {
+  color: rgba(240, 243, 245, 0.4) !important;
+  background: transparent !important;
+}
+
 .ibex-dashboard__form .acf-field .select2-container--default .select2-selection--multiple .select2-selection__choice {
   background: rgba(245, 166, 35, 0.2);
   border: 1px solid rgba(245, 166, 35, 0.45);
@@ -3021,6 +3058,17 @@ body.ibex-lightbox-open {
   width: min(100%, 80rem);
 }
 
+/* Page header image (GeneratePress featured image) - apply border-radius */
+.page-header-image {
+  border-radius: 1.5rem;
+  overflow: hidden;
+}
+
+.page-header-image img {
+  border-radius: 1.5rem;
+  display: block;
+}
+
 .ibex-archive-hero {
   position: relative;
   background: linear-gradient(
@@ -3177,6 +3225,18 @@ body.ibex-lightbox-open {
   margin: clamp(1.25rem, 3vw, 1.75rem) auto 0;
   padding: clamp(2.5rem, 6vw, 4.5rem) clamp(1.75rem, 6vw, 3.5rem) clamp(3rem, 6vw, 4.5rem);
   width: min(100%, 80rem);
+}
+
+/* Home page sections - reduced padding on all sides for tighter margins */
+.ibex-home-layout .ibex-archive-section {
+  margin: 0; /* Remove top margin since parent grid handles spacing */
+  padding: clamp(1rem, 2.5vw, 1.5rem); /* Uniform padding on all sides to match side margins */
+  /* Sections already have border-radius, background, and box-shadow from ibex-archive-section */
+}
+
+/* Sidebar section - minimal padding for edge-to-edge cards */
+.ibex-home-layout .ibex-home-sidebar.ibex-archive-section {
+  padding: clamp(0.5rem, 1.5vw, 0.75rem); /* Small padding for almost edge-to-edge cards */
 }
 
 .ibex-archive-section__header {
@@ -3724,23 +3784,61 @@ body.ibex-lightbox-open {
 }
 
 .ibex-home {
-  background: #101824;
+  background: transparent; /* Transparent to prevent showing through rounded corners */
   color: #f0f3f5;
 }
 
 .ibex-home-hero {
   position: relative;
-  min-height: clamp(20rem, 60vh, 28rem);
-  background: linear-gradient(135deg, rgba(16, 25, 39, 0.95), rgba(16, 25, 39, 0.75));
+  min-height: clamp(18rem, 50vh, 24rem); /* Reduced height since buttons are removed */
+  background: linear-gradient(
+    to top right,
+    rgba(14, 18, 26, 0.98) 0%,
+    rgba(16, 21, 30, 0.93) 50%,
+    rgba(18, 24, 34, 0.8) 78%,
+    rgba(245, 166, 35, 0.26) 100%
+  );
+  border-radius: 1.5rem; /* Match ibex-archive-hero */
+  max-width: 80rem;
+  margin: clamp(0.5rem, 2vw, 1.25rem) auto 0; /* Match ibex-archive-hero margin */
+  box-shadow: 0 30px 60px rgba(5, 8, 15, 0.35); /* Match ibex-archive-hero */
+  overflow: hidden; /* Clip background-image to border-radius */
+  width: min(100%, 80rem);
+  isolation: isolate; /* Create new stacking context for proper clipping */
+}
+
+/* Background image layer - needs to be clipped to border-radius */
+.ibex-home-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--hero-bg-image, none);
   background-size: cover;
   background-position: center;
-  overflow: hidden;
+  background-repeat: no-repeat;
+  border-radius: inherit; /* Clip background-image to border-radius */
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Add radial gradient overlay like archive heroes */
+.ibex-home-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 85% 15%, rgba(245, 166, 35, 0.35), transparent 60%);
+  opacity: 0.85;
+  border-radius: inherit;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .ibex-home-hero__overlay {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(12, 17, 25, 0.92));
   inset: 0;
   position: absolute;
+  z-index: 0;
+  border-radius: inherit; /* Ensure overlay respects parent border-radius */
 }
 
 .ibex-home-hero__content {
@@ -3769,7 +3867,7 @@ body.ibex-lightbox-open {
 .ibex-home-hero__subtitle {
   font-size: clamp(1.1rem, 2.5vw, 1.5rem);
   line-height: 1.7;
-  margin: 0 0 1.75rem;
+  margin: 0; /* Reduced margin since CTA buttons are removed */
   color: rgba(240, 243, 245, 0.85);
 }
 
@@ -3807,10 +3905,11 @@ body.ibex-lightbox-open {
 
 .ibex-home-layout {
   display: grid;
-  gap: clamp(2rem, 5vw, 3.5rem);
-  margin: clamp(2.5rem, 5vw, 4rem) auto clamp(3rem, 6vw, 5rem);
+  gap: clamp(1.25rem, 3vw, 1.75rem); /* Match ibex-archive-section gap */
+  margin: clamp(1.25rem, 3vw, 1.75rem) auto 0; /* Increased margin after hero to create separation */
   max-width: 80rem;
-  padding: 0 clamp(1.25rem, 4vw, 3rem);
+  padding: 0; /* Remove side padding to match hero section width exactly */
+  width: min(100%, 80rem); /* Match hero section width */
 }
 
 .ibex-home-primary__header {
@@ -3818,7 +3917,7 @@ body.ibex-lightbox-open {
   display: flex;
   gap: 1rem;
   justify-content: space-between;
-  margin-bottom: clamp(1.25rem, 3vw, 2rem);
+  margin-bottom: clamp(1.5rem, 4vw, 2.5rem); /* Match ibex-archive-section__header margin */
 }
 
 .ibex-home-primary__header h2 {
@@ -3855,9 +3954,9 @@ body.ibex-lightbox-open {
 }
 
 .ibex-home-sidebar-card {
-  background: linear-gradient(135deg, rgba(21, 28, 38, 0.94), rgba(14, 18, 27, 0.88));
-  border-radius: 1.25rem;
-  box-shadow: 0 20px 30px rgba(0, 0, 0, 0.25);
+  background: rgba(14, 18, 26, 0.96); /* Match ibex-archive-section black background */
+  border-radius: 1.5rem; /* Match other pages */
+  box-shadow: 0 30px 60px rgba(5, 8, 15, 0.38); /* Match other pages */
   overflow: hidden;
   position: relative;
   transition: transform 200ms ease, box-shadow 200ms ease;
@@ -3879,8 +3978,8 @@ body.ibex-lightbox-open {
 .ibex-home-sidebar-card__content {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  padding: clamp(1rem, 2vw, 1.5rem);
+  gap: 0.55rem;
+  padding: clamp(0.0rem, 0.0vw, 0.0rem); /* Small padding for almost edge-to-edge cards */
   position: relative;
 }
 
@@ -4009,18 +4108,33 @@ body.ibex-lightbox-open {
 
 .ibex-home-sidebar-card--full-width {
   width: 100%;
+  overflow: hidden; /* Prevent content from bleeding outside */
 }
 
 .ibex-home-sidebar-card--full-width .ibex-home-sidebar-card__content {
-  padding: clamp(0.75rem, 1.5vw, 1.25rem);
+  padding: clamp(0.5rem, 1.5vw, 0.75rem); /* Small padding for almost edge-to-edge cards */
+  box-sizing: border-box; /* Ensure padding is included in width */
 }
 
 .ibex-home-sidebar-card--full-width .ibex-event-card {
   margin-top: 0.5rem;
-  border-radius: 0;
-  margin-left: clamp(-0.75rem, -1.5vw, -1.25rem);
-  margin-right: clamp(-0.75rem, -1.5vw, -1.25rem);
-  width: calc(100% + clamp(1.5rem, 3vw, 2.5rem));
+  margin-left: 0;
+  margin-right: 0;
+  border-radius: 1rem; /* Restore border-radius to match other event cards */
+  width: 100%; /* Full width within parent padding */
+  max-width: 100%; /* Prevent overflow */
+  overflow: hidden; /* Ensure images are clipped to border-radius */
+  box-sizing: border-box; /* Ensure padding is included in width calculation */
+}
+
+/* Ensure event card media respects border-radius on all sides */
+.ibex-home-sidebar-card--full-width .ibex-event-card .ibex-event-card__media {
+  border-radius: 1rem 1rem 0 0; /* Round top corners, square bottom (content below) */
+  overflow: hidden;
+}
+
+.ibex-home-sidebar-card--full-width .ibex-event-card .ibex-event-card__image {
+  border-radius: 1rem 1rem 0 0; /* Round top corners to match card */
 }
 
 .ibex-event-card--full-width {
@@ -4076,8 +4190,12 @@ body.ibex-lightbox-open {
 }
 
 @media (max-width: 48rem) {
+  .ibex-home-hero {
+    min-height: clamp(5rem, 25vh, 16rem); /* Reduced height for mobile */
+  }
+
   .ibex-home-hero__content {
-    padding: clamp(2rem, 7vw, 3rem) clamp(1.25rem, 6vw, 2.5rem);
+    padding: clamp(1.5rem, 5vw, 2.5rem) clamp(1.25rem, 6vw, 2.5rem);
   }
 
   .ibex-home-layout {
@@ -4347,6 +4465,62 @@ body.ibex-lightbox-open {
   background: #111622;
 }
 
+/* Hide WordPress admin bar */
+#wpadminbar {
+  display: none !important;
+}
+
+/* Fixed header - stays at top while page scrolls */
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  max-width: 100% !important;
+  z-index: 1000;
+  background-color: var(--gp-header-background-color, var(--gp-base-color, #222222));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Ensure header inner container spans full width */
+.site-header .inside-header {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding-left: clamp(1rem, 4vw, 2rem);
+  padding-right: clamp(1rem, 4vw, 2rem);
+  padding-top: 0.5rem; /* Reduced vertical padding to shrink header */
+  padding-bottom: 0.5rem; /* Reduced vertical padding to shrink header */
+  box-sizing: border-box;
+}
+
+/* Reduce padding/margin around logo to shrink header height */
+.site-header .site-logo {
+  padding: 0;
+  margin: 0;
+}
+
+.site-header .site-logo img,
+.site-header .site-logo a {
+  padding: 0;
+  margin: 0;
+  display: block;
+}
+
+/* Override any GeneratePress container constraints on header */
+.site-header .container,
+.site-header .grid-container,
+.site-header .wrap {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* Add padding to body to account for fixed header */
+body {
+  padding-top: 80px; /* Adjust based on your header height */
+}
+
+/* Admin bar is hidden, so no need for admin bar adjustments */
+
 /* Header social media icons - vertical stack to the left of logo */
 .ibex-header-social {
   align-items: center;
@@ -4361,6 +4535,8 @@ body.ibex-lightbox-open {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 .ibex-header-social__link {
@@ -4454,6 +4630,58 @@ body.ibex-lightbox-open {
     background-color: transparent !important;
     box-shadow: none !important;
     padding: 1rem 0 !important;
+    overflow: hidden !important;
+  }
+
+
+  /* Completely hide menu when closed - prevent any visible background */
+  .site-header #site-navigation:not(.toggled):not([aria-expanded="true"]):not([style*="display: block"]) {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    display: none !important; /* Force hide when closed */
+  }
+
+  /* Ensure closed menu doesn't show any background bleed */
+  .site-header #site-navigation:not(.toggled):not([aria-expanded="true"])::before,
+  .site-header #site-navigation:not(.toggled):not([aria-expanded="true"])::after {
+    display: none !important;
+  }
+
+  /* Force hide inside-navigation when menu is closed - override any inline styles */
+  .site-header #site-navigation:not(.toggled):not([aria-expanded="true"]) .inside-navigation,
+  .site-header #site-navigation[style*="display: none"] .inside-navigation,
+  .site-header .menu-toggle[aria-expanded="false"] ~ #site-navigation .inside-navigation {
+    background-color: transparent !important; /* Remove black background when closed */
+    border: none !important;
+    padding: 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    overflow: hidden !important;
+    display: none !important; /* Force hide when closed */
+    position: absolute !important;
+    left: -9999px !important; /* Move off-screen as backup */
+  }
+
+  /* Also target the main-nav element inside */
+  .site-header #site-navigation:not(.toggled):not([aria-expanded="true"]):not([style*="display: block"]) .main-nav {
+    display: none !important;
+    height: 0 !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
   }
 
   /* Show background when menu is visible - match header background */
@@ -4464,10 +4692,24 @@ body.ibex-lightbox-open {
   .site-header #site-navigation[aria-expanded="true"] {
     background-color: var(--gp-header-background-color, var(--gp-base-color, #222222)) !important;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
+    padding: 1rem 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
   }
 
-  /* Style the navigation menu container */
-  .site-header #site-navigation .inside-navigation {
-    background-color: transparent !important;
+  /* Style the navigation menu container - only show background when open */
+  .site-header #site-navigation.toggled .inside-navigation,
+  .site-header #site-navigation[aria-expanded="true"] .inside-navigation {
+    background-color: var(--gp-header-background-color, var(--gp-base-color, #222222)) !important;
+    padding: 0.3rem 1rem 1rem !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
   }
 }

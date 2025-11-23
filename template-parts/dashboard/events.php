@@ -75,7 +75,8 @@ $query_args = [
   'post_status'    => 'any',
   'orderby'        => 'meta_value',
   'meta_key'       => 'event_start_date',
-  'order'          => 'DESC',
+  'meta_type'      => 'DATE', // Ensure proper date sorting
+  'order'          => 'ASC', // Ascending: earliest events first
 ];
 
 if (!$can_manage_all) {
