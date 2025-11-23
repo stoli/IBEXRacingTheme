@@ -249,6 +249,23 @@ if ($listing_post) {
 
         <div class="ibex-dashboard__form">
           <?php acf_form($form_config); ?>
+          
+          <?php if ($view_mode === 'edit' && $listing_post) : ?>
+            <?php
+            // Check if user can delete this listing (admin or creator)
+            $can_delete = current_user_can('manage_options') || (int) $listing_post->post_author === $current_user->ID;
+            if ($can_delete) :
+            ?>
+              <script type="text/template" class="ibex-delete-button-template">
+                <button type="button" 
+                        class="ibex-button ibex-button--danger ibex-delete-listing-btn" 
+                        data-listing-id="<?php echo esc_attr($listing_post->ID); ?>"
+                        data-listing-title="<?php echo esc_attr($listing_post->post_title); ?>">
+                  <?php esc_html_e('Delete Listing', 'ibex-racing-child'); ?>
+                </button>
+              </script>
+            <?php endif; ?>
+          <?php endif; ?>
         </div>
       </div>
     <?php endif; ?>

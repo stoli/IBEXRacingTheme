@@ -270,6 +270,23 @@ if ($event_post && function_exists('ibex_get_event_gallery') && function_exists(
         <div class="ibex-dashboard__form">
           <?php acf_form($form_config); ?>
           
+          <?php if ($view_mode === 'edit' && $event_post) : ?>
+            <?php
+            // Check if user can delete this event (admin or creator)
+            $can_delete = current_user_can('manage_options') || (int) $event_post->post_author === $current_user->ID;
+            if ($can_delete) :
+            ?>
+              <script type="text/template" class="ibex-delete-button-template">
+                <button type="button" 
+                        class="ibex-button ibex-button--danger ibex-delete-event-btn" 
+                        data-event-id="<?php echo esc_attr($event_post->ID); ?>"
+                        data-event-title="<?php echo esc_attr($event_post->post_title); ?>">
+                  <?php esc_html_e('Delete Event', 'ibex-racing-child'); ?>
+                </button>
+              </script>
+            <?php endif; ?>
+          <?php endif; ?>
+          
           <?php if ($existing_gallery && $gallery_link) : ?>
             <div class="ibex-dashboard__notice ibex-dashboard__notice--info" style="margin-top: 1.5rem;">
               <p style="margin: 0;">

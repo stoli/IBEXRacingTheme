@@ -313,6 +313,23 @@ $view_link   = $gallery_post ? get_permalink($gallery_post) : '';
 
         <div class="ibex-dashboard__form">
           <?php acf_form($acf_form_args); ?>
+          
+          <?php if ($view_mode === 'edit' && $gallery_post) : ?>
+            <?php
+            // Check if user can delete this gallery (admin or creator)
+            $can_delete = current_user_can('manage_options') || (int) $gallery_post->post_author === $current_user->ID;
+            if ($can_delete) :
+            ?>
+              <script type="text/template" class="ibex-delete-button-template">
+                <button type="button" 
+                        class="ibex-button ibex-button--danger ibex-delete-gallery-btn" 
+                        data-gallery-id="<?php echo esc_attr($gallery_post->ID); ?>"
+                        data-gallery-title="<?php echo esc_attr($gallery_post->post_title); ?>">
+                  <?php esc_html_e('Delete Gallery', 'ibex-racing-child'); ?>
+                </button>
+              </script>
+            <?php endif; ?>
+          <?php endif; ?>
         </div>
       </div>
     <?php endif; ?>

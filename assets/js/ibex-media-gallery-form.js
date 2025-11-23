@@ -276,6 +276,36 @@
     clearFormDirtyState();
   });
 
+  // Intercept dashboard navigation links to clear form state before navigation
+  // This prevents "leave site" warnings when clicking between items in the dashboard
+  $(document).on('click', '.ibex-dashboard__list-link, .ibex-dashboard__backlink, .ibex-dashboard__panel-action', function(e) {
+    // Clear form state before navigation
+    clearFormDirtyState();
+    
+    // Small delay to ensure handlers are cleared before navigation
+    var href = $(this).attr('href');
+    if (href && href !== '#' && !$(this).attr('target')) {
+      e.preventDefault();
+      setTimeout(function() {
+        window.location.href = href;
+      }, 10);
+      return false;
+    }
+  });
+
+  // Also clear on any link click within dashboard to be safe
+  $(document).on('click', '.ibex-dashboard a[href]', function(e) {
+    var $link = $(this);
+    // Only handle internal links (not external or special links)
+    var href = $link.attr('href');
+    if (href && href !== '#' && !$link.attr('target') && !$link.hasClass('ibex-delete-event-btn') && !$link.hasClass('ibex-delete-gallery-btn') && !$link.hasClass('ibex-delete-listing-btn')) {
+      // Check if it's a dashboard navigation link
+      if ($link.closest('.ibex-dashboard').length && !$link.closest('form').length) {
+        clearFormDirtyState();
+      }
+    }
+  });
+
   // Persistent check: if we're on a success page, keep clearing the handler
   // This prevents ACF from re-attaching it after page load
   if (window.location.search.indexOf('gallery_submitted') !== -1) {

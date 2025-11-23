@@ -178,6 +178,21 @@ add_action('wp_enqueue_scripts', function () {
       'ajaxUrl' => admin_url('admin-ajax.php'),
       'nonce'   => wp_create_nonce('ibex_event_gallery_lookup'),
     ]);
+
+    wp_enqueue_script(
+      'ibex-dashboard-delete',
+      get_stylesheet_directory_uri() . '/assets/js/ibex-dashboard-delete.js',
+      ['jquery'],
+      $theme_version . '.' . $ts,
+      true
+    );
+
+    wp_localize_script('ibex-dashboard-delete', 'ibexDelete', [
+      'ajaxUrl' => admin_url('admin-ajax.php'),
+      'eventNonce' => wp_create_nonce('ibex_delete_event'),
+      'galleryNonce' => wp_create_nonce('ibex_delete_gallery'),
+      'listingNonce' => wp_create_nonce('ibex_delete_listing'),
+    ]);
   }
 
   if (is_page_template('page-listing-dashboard.php')) {
@@ -188,6 +203,21 @@ add_action('wp_enqueue_scripts', function () {
       $theme_version . '.' . $ts,
       true
     );
+
+    wp_enqueue_script(
+      'ibex-dashboard-delete',
+      get_stylesheet_directory_uri() . '/assets/js/ibex-dashboard-delete.js',
+      ['jquery'],
+      $theme_version . '.' . $ts,
+      true
+    );
+
+    wp_localize_script('ibex-dashboard-delete', 'ibexDelete', [
+      'ajaxUrl' => admin_url('admin-ajax.php'),
+      'eventNonce' => wp_create_nonce('ibex_delete_event'),
+      'galleryNonce' => wp_create_nonce('ibex_delete_gallery'),
+      'listingNonce' => wp_create_nonce('ibex_delete_listing'),
+    ]);
 
     // Hide "Add Media" button in listing dashboard content editor
     $custom_css = '
@@ -207,6 +237,20 @@ add_action('wp_enqueue_scripts', function () {
       $theme_version . '.' . $ts,
       true
     );
+
+    wp_enqueue_script(
+      'ibex-dashboard-delete',
+      get_stylesheet_directory_uri() . '/assets/js/ibex-dashboard-delete.js',
+      ['jquery'],
+      $theme_version . '.' . $ts,
+      true
+    );
+
+    wp_localize_script('ibex-dashboard-delete', 'ibexDelete', [
+      'ajaxUrl' => admin_url('admin-ajax.php'),
+      'eventNonce' => wp_create_nonce('ibex_delete_event'),
+      'galleryNonce' => wp_create_nonce('ibex_delete_gallery'),
+    ]);
 
     // Hide "Add Media" button in event dashboard content editor
     $custom_css = '
@@ -1073,6 +1117,163 @@ add_action('wp_ajax_ibex_event_gallery_details', function () {
 
   wp_send_json_success($payload);
 });
+
+// AJAX handler for deleting events
+add_action('wp_ajax_ibex_delete_event', function () {
+  // Verify nonce
+  if (!check_ajax_referer('ibex_delete_event', 'nonce', false)) {
+    wp_send_json_error(['message' => esc_html__('Security check failed. Please refresh the page and try again.', 'ibex-racing-child')], 403);
+    return;
+  }
+
+  if (!is_user_logged_in()) {
+    wp_send_json_error(['message' => esc_html__('You must be logged in.', 'ibex-racing-child')], 401);
+    return;
+  }
+
+  $event_id = isset($_POST['event_id']) ? (int) $_POST['event_id'] : 0;
+  if (!$event_id) {
+    wp_send_json_error(['message' => esc_html__('Missing event ID.', 'ibex-racing-child')], 400);
+    return;
+  }
+
+  $event = get_post($event_id);
+  if (!$event || $event->post_type !== 'race_event') {
+    wp_send_json_error(['message' => esc_html__('Invalid event.', 'ibex-racing-child')], 404);
+    return;
+  }
+
+  $current_user = wp_get_current_user();
+  // Check permissions: admin or creator
+  $can_delete = current_user_can('manage_options') || (int) $event->post_author === $current_user->ID;
+  
+  if (!$can_delete) {
+    wp_send_json_error(['message' => esc_html__('You do not have permission to delete this event.', 'ibex-racing-child')], 403);
+    return;
+  }
+
+  // Delete the event (force delete, not trash)
+  $deleted = wp_delete_post($event_id, true);
+  
+  if (!$deleted) {
+    wp_send_json_error(['message' => esc_html__('Failed to delete event.', 'ibex-racing-child')], 500);
+    return;
+  }
+
+  wp_send_json_success([
+    'message' => esc_html__('Event deleted successfully.', 'ibex-racing-child'),
+    'redirect_url' => esc_url_raw(remove_query_arg(['event_id', 'mode', 'event_submitted'], get_permalink()))
+  ]);
+});
+
+// AJAX handler for deleting galleries (preserving media files)
+add_action('wp_ajax_ibex_delete_gallery', function () {
+  // Verify nonce
+  if (!check_ajax_referer('ibex_delete_gallery', 'nonce', false)) {
+    wp_send_json_error(['message' => esc_html__('Security check failed. Please refresh the page and try again.', 'ibex-racing-child')], 403);
+    return;
+  }
+
+  if (!is_user_logged_in()) {
+    wp_send_json_error(['message' => esc_html__('You must be logged in.', 'ibex-racing-child')], 401);
+    return;
+  }
+
+  $gallery_id = isset($_POST['gallery_id']) ? (int) $_POST['gallery_id'] : 0;
+  if (!$gallery_id) {
+    wp_send_json_error(['message' => esc_html__('Missing gallery ID.', 'ibex-racing-child')], 400);
+    return;
+  }
+
+  $gallery = get_post($gallery_id);
+  if (!$gallery || $gallery->post_type !== 'media_gallery') {
+    wp_send_json_error(['message' => esc_html__('Invalid gallery.', 'ibex-racing-child')], 404);
+    return;
+  }
+
+  $current_user = wp_get_current_user();
+  // Check permissions: admin or creator
+  $can_delete = current_user_can('manage_options') || (int) $gallery->post_author === $current_user->ID;
+  
+  if (!$can_delete) {
+    wp_send_json_error(['message' => esc_html__('You do not have permission to delete this gallery.', 'ibex-racing-child')], 403);
+    return;
+  }
+
+  // Get media items before deletion (for reference, but we won't delete them)
+  // ACF stores attachment IDs in fields, not as child posts, so they're safe
+  // But we'll explicitly prevent any attachment deletion just to be sure
+  
+  // Delete the gallery post (force delete, not trash)
+  // Media files (attachments) are NOT deleted because:
+  // 1. They're stored as separate posts with post_type 'attachment'
+  // 2. ACF stores them as IDs in fields, not as child posts
+  // 3. We're not calling wp_delete_attachment() on them
+  $deleted = wp_delete_post($gallery_id, true);
+  
+  if (!$deleted) {
+    wp_send_json_error(['message' => esc_html__('Failed to delete gallery.', 'ibex-racing-child')], 500);
+    return;
+  }
+
+  wp_send_json_success([
+    'message' => esc_html__('Gallery deleted successfully. Media files have been preserved.', 'ibex-racing-child'),
+    'redirect_url' => esc_url_raw(remove_query_arg(['gallery_id', 'mode', 'gallery_submitted', 'event_id'], get_permalink()))
+  ]);
+});
+
+// AJAX handler for deleting listings
+add_action('wp_ajax_ibex_delete_listing', function () {
+  // Verify nonce
+  if (!check_ajax_referer('ibex_delete_listing', 'nonce', false)) {
+    wp_send_json_error(['message' => esc_html__('Security check failed. Please refresh the page and try again.', 'ibex-racing-child')], 403);
+    return;
+  }
+
+  if (!is_user_logged_in()) {
+    wp_send_json_error(['message' => esc_html__('You must be logged in.', 'ibex-racing-child')], 401);
+    return;
+  }
+
+  $listing_id = isset($_POST['listing_id']) ? (int) $_POST['listing_id'] : 0;
+  if (!$listing_id) {
+    wp_send_json_error(['message' => esc_html__('Missing listing ID.', 'ibex-racing-child')], 400);
+    return;
+  }
+
+  $listing = get_post($listing_id);
+  if (!$listing || $listing->post_type !== 'listing') {
+    wp_send_json_error(['message' => esc_html__('Invalid listing.', 'ibex-racing-child')], 404);
+    return;
+  }
+
+  $current_user = wp_get_current_user();
+  // Check permissions: admin or creator
+  $can_delete = current_user_can('manage_options') || (int) $listing->post_author === $current_user->ID;
+  
+  if (!$can_delete) {
+    wp_send_json_error(['message' => esc_html__('You do not have permission to delete this listing.', 'ibex-racing-child')], 403);
+    return;
+  }
+
+  // Delete the listing (force delete, not trash)
+  // Media files (attachments) are NOT deleted because:
+  // 1. They're stored as separate posts with post_type 'attachment'
+  // 2. ACF stores them as IDs in fields, not as child posts
+  // 3. We're not calling wp_delete_attachment() on them
+  $deleted = wp_delete_post($listing_id, true);
+  
+  if (!$deleted) {
+    wp_send_json_error(['message' => esc_html__('Failed to delete listing.', 'ibex-racing-child')], 500);
+    return;
+  }
+
+  wp_send_json_success([
+    'message' => esc_html__('Listing deleted successfully. Media files have been preserved.', 'ibex-racing-child'),
+    'redirect_url' => esc_url_raw(remove_query_arg(['listing_id', 'mode', 'listing_submitted'], get_permalink()))
+  ]);
+});
+
 add_filter('acf/load_value/name=event_featured_image', function ($value, $post_id) {
   if ($value) {
     return $value;
