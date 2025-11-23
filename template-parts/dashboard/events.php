@@ -126,6 +126,28 @@ $form_config = [
 if ($event_post) {
   $form_config['post_id'] = $event_post->ID;
 }
+
+// Check if a gallery already exists for this event
+$existing_gallery = null;
+$gallery_link = '';
+if ($event_post && function_exists('ibex_get_event_gallery') && function_exists('ibex_get_page_link_by_template')) {
+  $existing_gallery = ibex_get_event_gallery($event_post->ID, true);
+  if ($existing_gallery) {
+    // Hide the create_media_gallery field if gallery exists
+    add_filter('acf/prepare_field/name=create_media_gallery', function($field) {
+      return false; // Hide the field
+    });
+    
+    // Get the gallery dashboard URL
+    $gallery_dashboard_url = ibex_get_page_link_by_template('page-media-gallery-dashboard.php');
+    if ($gallery_dashboard_url) {
+      $gallery_link = add_query_arg(
+        ['gallery_id' => $existing_gallery->ID],
+        $gallery_dashboard_url
+      );
+    }
+  }
+}
 ?>
 
 <div class="ibex-dashboard__panels">
@@ -247,6 +269,24 @@ if ($event_post) {
 
         <div class="ibex-dashboard__form">
           <?php acf_form($form_config); ?>
+          
+          <?php if ($existing_gallery && $gallery_link) : ?>
+            <div class="ibex-dashboard__notice ibex-dashboard__notice--info" style="margin-top: 1.5rem;">
+              <p style="margin: 0;">
+                <?php
+                printf(
+                  /* translators: %1$s: gallery title, %2$s: link to gallery */
+                  esc_html__('A media gallery already exists for this event: %1$s', 'ibex-racing-child'),
+                  sprintf(
+                    '<a href="%s">%s</a>',
+                    esc_url($gallery_link),
+                    esc_html($existing_gallery->post_title)
+                  )
+                );
+                ?>
+              </p>
+            </div>
+          <?php endif; ?>
         </div>
       </div>
     <?php endif; ?>

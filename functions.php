@@ -718,6 +718,7 @@ add_action('acf/init', function () {
         'display_format' => 'F j, Y',
         'return_format' => 'Y-m-d',
         'first_day' => 1,
+        'width' => 50,
         'instructions' => 'Primary date displayed with the gallery. Defaults from related event when selected.',
       ],
       [
@@ -729,6 +730,7 @@ add_action('acf/init', function () {
         'display_format' => 'F j, Y',
         'return_format' => 'Y-m-d',
         'first_day' => 1,
+        'width' => 50,
         'instructions' => 'Optional; fill in for multi-day galleries.',
       ],
       [
@@ -1030,24 +1032,37 @@ add_action('acf/save_post', function ($post_id) {
   }
 }, 20);
 add_action('wp_ajax_ibex_event_gallery_details', function () {
-  check_ajax_referer('ibex_event_gallery_lookup', 'nonce');
+  // Verify nonce - use die=false to handle error gracefully
+  if (!check_ajax_referer('ibex_event_gallery_lookup', 'nonce', false)) {
+    wp_send_json_error(['message' => esc_html__('Security check failed. Please refresh the page and try again.', 'ibex-racing-child')], 403);
+    return;
+  }
 
   if (!is_user_logged_in()) {
     wp_send_json_error(['message' => esc_html__('You must be logged in.', 'ibex-racing-child')], 401);
+    return;
   }
 
   $event_id = isset($_POST['eventId']) ? (int) $_POST['eventId'] : 0;
   if (!$event_id) {
     wp_send_json_error(['message' => esc_html__('Missing event ID.', 'ibex-racing-child')], 400);
+    return;
   }
 
   $event = get_post($event_id);
   if (!$event || $event->post_type !== 'race_event') {
     wp_send_json_error(['message' => esc_html__('Invalid event selected.', 'ibex-racing-child')], 404);
+    return;
   }
 
-  if (!current_user_can('edit_post', $event_id)) {
+  // Allow access if user can read the event OR can edit media galleries
+  // This allows gallery editors to pull event data even if they can't edit the event
+  $can_read_event = current_user_can('read_post', $event_id);
+  $can_edit_galleries = current_user_can('edit_media_galleries');
+  
+  if (!$can_read_event && !$can_edit_galleries) {
     wp_send_json_error(['message' => esc_html__('You do not have permission to access this event.', 'ibex-racing-child')], 403);
+    return;
   }
 
   $payload = [
@@ -1077,8 +1092,33 @@ add_filter('acf/validate_value/key=field_ibex_media_gallery_related_event', func
     return $valid;
   }
 
-  $current_post_id = acf_maybe_get_POST('post_id'); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-  $current_post_id = is_numeric($current_post_id) ? (int) $current_post_id : 0;
+  // Try multiple methods to get the current post ID
+  $current_post_id = 0;
+  
+  // Method 1: ACF form data (most reliable)
+  if (function_exists('acf_get_form_data')) {
+    $form_post_id = acf_get_form_data('post_id');
+    if ($form_post_id && is_numeric($form_post_id)) {
+      $current_post_id = (int) $form_post_id;
+    }
+  }
+  
+  // Method 2: POST data
+  if ($current_post_id === 0) {
+    $post_id_from_post = acf_maybe_get_POST('post_id'); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+    if ($post_id_from_post && is_numeric($post_id_from_post)) {
+      $current_post_id = (int) $post_id_from_post;
+    }
+  }
+  
+  // Method 3: Check if we're editing an existing gallery by checking the current related event
+  if ($current_post_id === 0 && isset($_GET['gallery_id'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+    $gallery_id = (int) $_GET['gallery_id']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+    $gallery = get_post($gallery_id);
+    if ($gallery && $gallery->post_type === 'media_gallery') {
+      $current_post_id = $gallery_id;
+    }
+  }
 
   $query_args = [
     'post_type'      => 'media_gallery',
@@ -1089,8 +1129,16 @@ add_filter('acf/validate_value/key=field_ibex_media_gallery_related_event', func
     'meta_value'     => $value,
   ];
 
+  // Exclude the current gallery from the check
   if ($current_post_id > 0) {
     $query_args['post__not_in'] = [$current_post_id];
+    
+    // Also verify: if the current gallery already has this event assigned, allow it
+    $current_gallery_event = get_field('media_gallery_related_event', $current_post_id);
+    if ($current_gallery_event && (int) $current_gallery_event === (int) $value) {
+      // This gallery already has this event - no conflict
+      return $valid;
+    }
   }
 
   $existing = get_posts($query_args);
@@ -1593,6 +1641,295 @@ add_filter('acf/load_value/name=media_gallery_cover_image', function ($value, $p
 
   $thumbnail_id = get_post_thumbnail_id((int) $post_id);
   return $thumbnail_id ?: $value;
+}, 10, 2);
+
+// v2025-01-XX — FileBird integration for organized media folders
+/**
+ * Create a FileBird folder for a post (gallery or team member).
+ * 
+ * @param int    $post_id Post ID
+ * @param string $folder_name Folder name (will be sanitized)
+ * @return int|false Folder ID on success, false on failure
+ */
+function ibex_create_filebird_folder(int $post_id, string $folder_name): int|false {
+  // Check if FileBird is active
+  if (!class_exists('FileBird\Folder') && !function_exists('njt_fb_create_folder') && !taxonomy_exists('nt_wmc_folder')) {
+    return false;
+  }
+
+  // Sanitize folder name (shorten if too long, remove special chars)
+  $sanitized_name = sanitize_file_name($folder_name);
+  // Limit to 50 characters to keep folder names manageable
+  if (mb_strlen($sanitized_name) > 50) {
+    $sanitized_name = mb_substr($sanitized_name, 0, 47) . '...';
+  }
+
+  // Check if folder already exists for this post
+  $existing_folder_id = ibex_get_filebird_folder_id($post_id);
+  if ($existing_folder_id) {
+    return $existing_folder_id;
+  }
+
+  try {
+    // Method 1: FileBird class-based API (newer versions)
+    if (class_exists('FileBird\Folder')) {
+      if (method_exists('FileBird\Folder', 'createFolder')) {
+        $folder_id = \FileBird\Folder::createFolder($sanitized_name, 0);
+        if ($folder_id) {
+          update_post_meta($post_id, '_ibex_filebird_folder_id', (int) $folder_id);
+          return (int) $folder_id;
+        }
+      }
+    }
+    
+    // Method 2: FileBird function-based API
+    if (function_exists('njt_fb_create_folder')) {
+      $folder_id = njt_fb_create_folder($sanitized_name, 0);
+      if ($folder_id) {
+        update_post_meta($post_id, '_ibex_filebird_folder_id', (int) $folder_id);
+        return (int) $folder_id;
+      }
+    }
+    
+    // Method 3: Direct taxonomy approach (FileBird uses 'nt_wmc_folder' taxonomy)
+    if (taxonomy_exists('nt_wmc_folder')) {
+      // Check if folder with this name already exists
+      $existing_term = get_term_by('name', $sanitized_name, 'nt_wmc_folder');
+      if ($existing_term) {
+        update_post_meta($post_id, '_ibex_filebird_folder_id', (int) $existing_term->term_id);
+        return (int) $existing_term->term_id;
+      }
+      
+      $term = wp_insert_term($sanitized_name, 'nt_wmc_folder');
+      if (!is_wp_error($term) && isset($term['term_id'])) {
+        update_post_meta($post_id, '_ibex_filebird_folder_id', (int) $term['term_id']);
+        return (int) $term['term_id'];
+      }
+    }
+    
+    // Method 4: Try FileBird's action hook
+    do_action('filebird_create_folder', $sanitized_name, 0, $post_id);
+    
+  } catch (Exception $e) {
+    // Log error but don't break the save process
+    error_log('FileBird folder creation failed: ' . $e->getMessage());
+    return false;
+  }
+
+  return false;
+}
+
+/**
+ * Get FileBird folder ID for a post.
+ */
+function ibex_get_filebird_folder_id(int $post_id): ?int {
+  $folder_id = get_post_meta($post_id, '_ibex_filebird_folder_id', true);
+  return $folder_id ? (int) $folder_id : null;
+}
+
+// Create FileBird folder when media gallery is saved
+add_action('acf/save_post', function ($post_id) {
+  if (wp_is_post_autosave($post_id) || wp_is_post_revision($post_id)) {
+    return;
+  }
+
+  $post = get_post($post_id);
+  if (!$post) {
+    return;
+  }
+
+  // Handle media gallery
+  if ($post->post_type === 'media_gallery') {
+    // Check if folder already exists
+    $existing_folder_id = ibex_get_filebird_folder_id($post_id);
+    if ($existing_folder_id) {
+      return; // Folder already created
+    }
+
+    // Create folder based on gallery title
+    $gallery_title = get_the_title($post_id);
+    if ($gallery_title) {
+      ibex_create_filebird_folder($post_id, $gallery_title);
+    }
+  }
+
+  // Handle team member
+  if ($post->post_type === 'team_member') {
+    // Check if folder already exists
+    $existing_folder_id = ibex_get_filebird_folder_id($post_id);
+    if ($existing_folder_id) {
+      return; // Folder already created
+    }
+
+    // Create folder based on team member name
+    $member_name = get_the_title($post_id);
+    if ($member_name) {
+      ibex_create_filebird_folder($post_id, $member_name);
+    }
+  }
+}, 30); // Run after other save_post hooks
+
+// Filter ACF media library to default to the relevant folder
+add_filter('acf/fields/gallery/query', function ($args, $field, $post_id) {
+  // Only filter for media gallery items field
+  if ($field['name'] !== 'media_gallery_items') {
+    return $args;
+  }
+
+  // Get the gallery's folder ID
+  $gallery_id = $post_id;
+  if (!$gallery_id || get_post_type($gallery_id) !== 'media_gallery') {
+    // Try to get gallery ID from form context
+    if (function_exists('acf_get_form_data')) {
+      $form_post_id = acf_get_form_data('post_id');
+      if ($form_post_id && get_post_type($form_post_id) === 'media_gallery') {
+        $gallery_id = (int) $form_post_id;
+      }
+    }
+  }
+
+  if ($gallery_id) {
+    $folder_id = ibex_get_filebird_folder_id($gallery_id);
+    if ($folder_id) {
+      // FileBird filters attachments by folder using meta query
+      // FileBird stores folder assignment in attachment meta: '_filebird_folder' or 'nt_wmc_folder'
+      if (!isset($args['meta_query'])) {
+        $args['meta_query'] = [];
+      }
+      
+      // Try different meta keys FileBird might use
+      $args['meta_query'][] = [
+        'relation' => 'OR',
+        [
+          'key' => '_filebird_folder',
+          'value' => $folder_id,
+          'compare' => '=',
+        ],
+        [
+          'key' => 'nt_wmc_folder',
+          'value' => $folder_id,
+          'compare' => '=',
+        ],
+      ];
+    }
+  }
+
+  return $args;
+}, 10, 3);
+
+// Filter ACF media library queries to default to the relevant folder
+// Note: This sets the initial view to the folder, but users can still navigate to other folders via FileBird's UI
+add_filter('ajax_query_attachments_args', function ($query) {
+  // Get current post being edited
+  $current_post_id = 0;
+  
+  // Try to get from ACF form context
+  if (function_exists('acf_get_form_data')) {
+    $form_post_id = acf_get_form_data('post_id');
+    if ($form_post_id && is_numeric($form_post_id)) {
+      $current_post_id = (int) $form_post_id;
+    }
+  }
+
+  // Try to get from POST data (ACF media picker)
+  if (!$current_post_id && isset($_POST['post_id']) && is_numeric($_POST['post_id'])) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+    $current_post_id = (int) $_POST['post_id']; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+  }
+
+  // Try to get from GET parameter (some ACF contexts)
+  if (!$current_post_id && isset($_GET['post_id']) && is_numeric($_GET['post_id'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+    $current_post_id = (int) $_GET['post_id']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+  }
+
+  if ($current_post_id) {
+    $post_type = get_post_type($current_post_id);
+    $folder_id = null;
+
+    // Get folder ID based on post type
+    if ($post_type === 'media_gallery' || $post_type === 'team_member') {
+      $folder_id = ibex_get_filebird_folder_id($current_post_id);
+    }
+
+    if ($folder_id) {
+      // FileBird stores folder assignments in attachment meta or taxonomy
+      // We'll set the initial filter, but FileBird's UI will still allow navigation
+      
+      // Method 1: Taxonomy-based (FileBird uses 'nt_wmc_folder' taxonomy)
+      if (taxonomy_exists('nt_wmc_folder')) {
+        if (!isset($query['tax_query'])) {
+          $query['tax_query'] = [];
+        }
+        // Add folder filter - this will show files in this folder by default
+        $query['tax_query'][] = [
+          'taxonomy' => 'nt_wmc_folder',
+          'field' => 'term_id',
+          'terms' => $folder_id,
+        ];
+      } else {
+        // Method 2: Meta-based
+        if (!isset($query['meta_query'])) {
+          $query['meta_query'] = [];
+        }
+        $query['meta_query'][] = [
+          'relation' => 'OR',
+          [
+            'key' => '_filebird_folder',
+            'value' => $folder_id,
+            'compare' => '=',
+          ],
+          [
+            'key' => 'nt_wmc_folder',
+            'value' => $folder_id,
+            'compare' => '=',
+          ],
+        ];
+      }
+      
+      // Store folder ID in query for FileBird to use
+      $query['filebird_folder'] = $folder_id;
+    }
+  }
+
+  return $query;
+}, 10, 1);
+
+// Also filter when attachments are uploaded - assign to folder automatically
+add_filter('wp_generate_attachment_metadata', function ($metadata, $attachment_id) {
+  // Get the current post context
+  $current_post_id = 0;
+  
+  if (function_exists('acf_get_form_data')) {
+    $form_post_id = acf_get_form_data('post_id');
+    if ($form_post_id && is_numeric($form_post_id)) {
+      $current_post_id = (int) $form_post_id;
+    }
+  }
+
+  // Try to get from POST data
+  if (!$current_post_id && isset($_POST['post_id']) && is_numeric($_POST['post_id'])) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+    $current_post_id = (int) $_POST['post_id']; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+  }
+
+  if ($current_post_id) {
+    $post_type = get_post_type($current_post_id);
+    
+    if ($post_type === 'media_gallery' || $post_type === 'team_member') {
+      $folder_id = ibex_get_filebird_folder_id($current_post_id);
+      
+      if ($folder_id) {
+        // Assign attachment to folder
+        // FileBird uses taxonomy or meta
+        if (taxonomy_exists('nt_wmc_folder')) {
+          wp_set_object_terms($attachment_id, [$folder_id], 'nt_wmc_folder');
+        } else {
+          update_post_meta($attachment_id, '_filebird_folder', $folder_id);
+          update_post_meta($attachment_id, 'nt_wmc_folder', $folder_id);
+        }
+      }
+    }
+  }
+
+  return $metadata;
 }, 10, 2);
 
 // v2025-01-XX — Header social media icons
