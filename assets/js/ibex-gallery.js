@@ -85,6 +85,18 @@
     let panY = 0;
     let hasPanned = false; // Track if user actually panned (moved mouse)
     let panStartTime = 0;
+    
+    // Pinch-to-zoom variables
+    let isPinching = false;
+    let currentScale = 1;
+    let initialPinchDistance = 0;
+    let initialPinchScale = 1;
+    let initialPinchCenterX = 0;
+    let initialPinchCenterY = 0;
+    let initialPinchPanX = 0;
+    let initialPinchPanY = 0;
+    const minScale = 1;
+    const maxScale = 5;
 
     const toggleZoom = () => {
       isZoomed = !isZoomed;
@@ -93,6 +105,7 @@
         // Reset pan position when zooming in
         panX = 0;
         panY = 0;
+        currentScale = 1;
         updateImageTransform();
         lightboxImage.style.cursor = 'zoom-out';
       } else {
@@ -100,21 +113,29 @@
         // Reset pan position when zooming out
         panX = 0;
         panY = 0;
+        currentScale = 1;
         updateImageTransform();
         lightboxImage.style.cursor = 'zoom-in';
       }
     };
 
     const updateImageTransform = () => {
-      if (isZoomed) {
-        lightboxImage.style.transform = `translate(${panX}px, ${panY}px)`;
+      if (isZoomed || currentScale > 1) {
+        // Use scale from pinch if available, otherwise use 1 (for click zoom)
+        const scale = currentScale > 1 ? currentScale : 1;
+        lightboxImage.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        // Ensure zoomed class is active when scaled
+        if (scale > 1 && !isZoomed) {
+          isZoomed = true;
+          lightbox.classList.add('ibex-lightbox--zoomed');
+        }
       } else {
-        lightboxImage.style.transform = 'translate(0, 0)';
+        lightboxImage.style.transform = 'translate(0, 0) scale(1)';
       }
     };
 
     const startPan = (clientX, clientY) => {
-      if (!isZoomed) {
+      if (!isZoomed && currentScale <= 1) {
         return;
       }
       isPanning = true;
@@ -129,7 +150,7 @@
     };
 
     const doPan = (clientX, clientY) => {
-      if (!isPanning || !isZoomed) {
+      if (!isPanning || (!isZoomed && currentScale <= 1)) {
         return;
       }
       
@@ -146,12 +167,16 @@
       panX = panStartPanX + deltaX;
       panY = panStartPanY + deltaY;
       
-      // Constrain panning to image bounds
+      // Constrain panning to image bounds (account for scale)
       const imageRect = lightboxImage.getBoundingClientRect();
       const frameRect = lightbox.querySelector('.ibex-lightbox__frame').getBoundingClientRect();
+      const scale = currentScale > 1 ? currentScale : 1;
       
-      const maxX = Math.max(0, (imageRect.width - frameRect.width) / 2);
-      const maxY = Math.max(0, (imageRect.height - frameRect.height) / 2);
+      // Calculate scaled dimensions
+      const scaledWidth = imageRect.width * scale;
+      const scaledHeight = imageRect.height * scale;
+      const maxX = Math.max(0, (scaledWidth - frameRect.width) / 2);
+      const maxY = Math.max(0, (scaledHeight - frameRect.height) / 2);
       
       panX = Math.max(-maxX, Math.min(maxX, panX));
       panY = Math.max(-maxY, Math.min(maxY, panY));
@@ -232,6 +257,8 @@
       }
       panX = 0;
       panY = 0;
+      currentScale = 1;
+      isPinching = false;
       updateImageTransform();
     };
 
@@ -263,8 +290,10 @@
       lightboxImage.src = '';
       isZoomed = false;
       isPanning = false;
+      isPinching = false;
       panX = 0;
       panY = 0;
+      currentScale = 1;
       updateImageTransform();
       if (previousFocus) {
         previousFocus.focus();
@@ -350,27 +379,135 @@
       stopPan();
     });
 
-    // Touch events for mobile panning
+    // Helper function to calculate distance between two touches
+    const getTouchDistance = (touch1, touch2) => {
+      const dx = touch2.clientX - touch1.clientX;
+      const dy = touch2.clientY - touch1.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    // Helper function to get center point between two touches
+    const getTouchCenter = (touch1, touch2) => {
+      return {
+        x: (touch1.clientX + touch2.clientX) / 2,
+        y: (touch1.clientY + touch2.clientY) / 2
+      };
+    };
+
+    // Touch events for mobile panning and pinch-to-zoom
     lightboxImage.addEventListener('touchstart', (event) => {
-      if (!isZoomed || event.touches.length !== 1) {
-        return;
+      if (event.touches.length === 2) {
+        // Pinch gesture detected
+        event.preventDefault();
+        event.stopPropagation();
+        isPinching = true;
+        isPanning = false;
+        
+        const touch1 = event.touches[0];
+        const touch2 = event.touches[1];
+        
+        initialPinchDistance = getTouchDistance(touch1, touch2);
+        initialPinchScale = currentScale > 1 ? currentScale : 1;
+        initialPinchPanX = panX;
+        initialPinchPanY = panY;
+        
+        const center = getTouchCenter(touch1, touch2);
+        initialPinchCenterX = center.x;
+        initialPinchCenterY = center.y;
+        
+        // Ensure zoomed state is active
+        if (!isZoomed) {
+          isZoomed = true;
+          lightbox.classList.add('ibex-lightbox--zoomed');
+        }
+      } else if (event.touches.length === 1 && (isZoomed || currentScale > 1)) {
+        // Single touch panning (only if zoomed)
+        event.preventDefault();
+        event.stopPropagation();
+        if (!isPinching) {
+          const touch = event.touches[0];
+          startPan(touch.clientX, touch.clientY);
+        }
       }
-      event.preventDefault();
-      event.stopPropagation();
-      const touch = event.touches[0];
-      startPan(touch.clientX, touch.clientY);
     });
 
     document.addEventListener('touchmove', (event) => {
-      if (isPanning && isZoomed && event.touches.length === 1) {
+      if (isPinching && event.touches.length === 2) {
+        // Handle pinch-to-zoom
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const touch1 = event.touches[0];
+        const touch2 = event.touches[1];
+        const currentDistance = getTouchDistance(touch1, touch2);
+        
+        // Calculate scale based on distance change
+        const scaleChange = currentDistance / initialPinchDistance;
+        currentScale = Math.max(minScale, Math.min(maxScale, initialPinchScale * scaleChange));
+        
+        // Calculate new center point
+        const currentCenter = getTouchCenter(touch1, touch2);
+        
+        // Get frame dimensions for calculations
+        const frameRect = lightbox.querySelector('.ibex-lightbox__frame').getBoundingClientRect();
+        const frameCenterX = frameRect.left + frameRect.width / 2;
+        const frameCenterY = frameRect.top + frameRect.height / 2;
+        
+        // Calculate the offset of the pinch center from the frame center (in screen coordinates)
+        const initialOffsetX = initialPinchCenterX - frameCenterX;
+        const initialOffsetY = initialPinchCenterY - frameCenterY;
+        const currentOffsetX = currentCenter.x - frameCenterX;
+        const currentOffsetY = currentCenter.y - frameCenterY;
+        
+        // To keep the pinch center point stable during scaling:
+        // 1. Calculate the image-space position of the pinch point before scaling
+        // 2. After scaling, adjust pan so that point stays at the same screen position
+        const imageSpaceX = (initialOffsetX - initialPinchPanX) / initialPinchScale;
+        const imageSpaceY = (initialOffsetY - initialPinchPanY) / initialPinchScale;
+        
+        // Adjust pan to maintain the pinch center position
+        panX = currentOffsetX - (imageSpaceX * currentScale);
+        panY = currentOffsetY - (imageSpaceY * currentScale);
+        
+        // Constrain panning to image bounds
+        const imageRect = lightboxImage.getBoundingClientRect();
+        const scaledWidth = imageRect.width * currentScale;
+        const scaledHeight = imageRect.height * currentScale;
+        const maxX = Math.max(0, (scaledWidth - frameRect.width) / 2);
+        const maxY = Math.max(0, (scaledHeight - frameRect.height) / 2);
+        
+        panX = Math.max(-maxX, Math.min(maxX, panX));
+        panY = Math.max(-maxY, Math.min(maxY, panY));
+        
+        updateImageTransform();
+      } else if (isPanning && (isZoomed || currentScale > 1) && event.touches.length === 1 && !isPinching) {
+        // Single touch panning
         event.preventDefault();
         const touch = event.touches[0];
         doPan(touch.clientX, touch.clientY);
       }
     });
 
-    document.addEventListener('touchend', () => {
-      stopPan();
+    document.addEventListener('touchend', (event) => {
+      if (event.touches.length < 2) {
+        // Pinch ended
+        isPinching = false;
+      }
+      if (event.touches.length === 0) {
+        // All touches ended
+        stopPan();
+        isPinching = false;
+        
+        // If scale is back to 1, reset zoom state
+        if (currentScale <= 1) {
+          isZoomed = false;
+          lightbox.classList.remove('ibex-lightbox--zoomed');
+          currentScale = 1;
+          panX = 0;
+          panY = 0;
+          updateImageTransform();
+        }
+      }
     });
 
     lightbox.addEventListener('click', (event) => {
