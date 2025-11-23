@@ -2376,3 +2376,8 @@ add_filter('wp_new_user_notification_email', function ($wp_new_user_notification
   return $wp_new_user_notification_email;
 }, 10, 3);
 
+// v2025-01-XX — Override footer copyright text
+add_filter('generate_copyright', function($copyright) {
+  return '© 2025 IBEX Racing • Built by JViBe.ai';
+});
+

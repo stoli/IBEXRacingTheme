@@ -1793,6 +1793,7 @@ body.ibex-lightbox-open {
 .ibex-dashboard__panels {
   display: grid;
   gap: clamp(1.25rem, 3vw, 2rem);
+  align-items: start; /* Prevent panels from stretching to match height */
 }
 
 .ibex-dashboard__panel {
@@ -2438,6 +2439,9 @@ body.ibex-lightbox-open {
   gap: 1rem;
   justify-items: center;
   background: rgba(9, 13, 21, 0.6);
+  min-height: auto; /* Allow natural height */
+  height: auto; /* Don't stretch to match sidebar */
+  align-self: start; /* Align to top, don't stretch */
 }
 
 .ibex-dashboard__empty-state h2 {
@@ -2457,6 +2461,9 @@ body.ibex-lightbox-open {
 
 .ibex-dashboard__cta {
   min-width: 10rem;
+  width: auto; /* Prevent button from stretching */
+  max-width: fit-content;
+  justify-self: center; /* Center the button */
 }
 
 .ibex-dashboard__editor {
