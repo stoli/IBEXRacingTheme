@@ -34,9 +34,8 @@ add_action('wp_enqueue_scripts', function() {
   );
 
   if (is_singular('listing') || is_singular('media_gallery')) {
-    // Use explicit URL construction to avoid path issues
-    $theme_slug = get_stylesheet();
-    $gallery_js_url = content_url('themes/' . $theme_slug . '/assets/js/ibex-gallery.js');
+    // Use get_stylesheet_directory_uri() for more reliable path
+    $gallery_js_url = get_stylesheet_directory_uri() . '/assets/js/ibex-gallery.js';
     
     // Get version from file if it exists, otherwise use theme version
     $gallery_js_path = $stylesheet_path . '/assets/js/ibex-gallery.js';
@@ -45,10 +44,6 @@ add_action('wp_enqueue_scripts', function() {
       $gallery_js_version = filemtime($gallery_js_path);
     }
     
-    // Ensure URL doesn't have double slashes and is properly formatted
-    $gallery_js_url = str_replace(['/./', '//'], '/', $gallery_js_url);
-    $gallery_js_url = preg_replace('#([^:])//+#', '$1/', $gallery_js_url);
-    
     wp_enqueue_script(
       'ibex-gallery',
       $gallery_js_url,
@@ -56,6 +51,9 @@ add_action('wp_enqueue_scripts', function() {
       $gallery_js_version,
       true
     );
+    
+    // DEBUG: Uncomment below for debugging script enqueue
+    // error_log('IBEX Gallery: Enqueuing script at ' . $gallery_js_url . ' (version: ' . $gallery_js_version . ')');
   }
 }, 10);
 
