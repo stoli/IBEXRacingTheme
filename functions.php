@@ -417,9 +417,10 @@ add_filter('map_meta_cap', function (array $caps, string $cap, int $user_id, arr
     }
   }
 
-  // Handle edit_post capability for media_gallery to allow admins to attach files
+  // Handle edit_post capability for media_gallery and race_event to allow admins to attach files
   if ($cap === 'edit_post' && !empty($args[0])) {
     $post = get_post((int) $args[0]);
+    
     if ($post && $post->post_type === 'media_gallery') {
       // If user is the author, they can edit
       if ((int) $post->post_author === $user_id) {
@@ -429,6 +430,18 @@ add_filter('map_meta_cap', function (array $caps, string $cap, int $user_id, arr
       // Admins can always edit (and thus attach files to) any media gallery
       if (user_can($user_id, 'manage_options') || user_can($user_id, 'edit_others_media_galleries')) {
         return ['edit_others_media_galleries'];
+      }
+    }
+    
+    if ($post && $post->post_type === 'race_event') {
+      // If user is the author, they can edit
+      if ((int) $post->post_author === $user_id) {
+        return ['edit_race_events'];
+      }
+
+      // Admins can always edit (and thus attach files to) any race event
+      if (user_can($user_id, 'manage_options') || user_can($user_id, 'edit_others_race_events')) {
+        return ['edit_others_race_events'];
       }
     }
   }
