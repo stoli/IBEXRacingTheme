@@ -53,6 +53,18 @@ while (have_posts()) :
     $show_cta = $cta_label && $cta_url;
   }
   
+  // Override CTA URL for "Connect with Us" button on "Who We Are" page
+  $page_slug = get_post_field('post_name', $page_id);
+  $is_who_we_are = in_array(strtolower($page_slug), ['who-we-are', 'who-we-are-2', 'about']);
+  $is_connect_cta = $cta_label && stripos($cta_label, 'Connect') !== false && stripos($cta_label, 'Us') !== false;
+  
+  if ($is_who_we_are && $is_connect_cta) {
+    $contact_email = 'info@ibexracing.com';
+    $contact_subject = 'IBEXRacing.com web inquiry';
+    $cta_url = sprintf('mailto:%s?subject=%s', antispambot($contact_email), rawurlencode($contact_subject));
+    $show_cta = true;
+  }
+  
   ?>
 
   <main id="primary" class="site-main ibex-page">

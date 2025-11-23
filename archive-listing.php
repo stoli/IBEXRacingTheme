@@ -46,11 +46,14 @@ $contact_page = get_permalink(get_page_by_path('contact'));
         <?php echo wp_kses_post($archive_description); ?>
       </div>
       <div class="ibex-archive-hero__cta">
-        <?php if ($contact_page) : ?>
-          <a class="ibex-button ibex-button--outline" href="<?php echo esc_url($contact_page); ?>">
-            <?php esc_html_e('Contact Sales', 'ibex-racing-child'); ?>
-          </a>
-        <?php endif; ?>
+        <?php
+        $sales_email = 'info@ibexracing.com';
+        $sales_subject = 'IBEXRacing.com sales inquiry';
+        $sales_mailto = sprintf('mailto:%s?subject=%s', antispambot($sales_email), rawurlencode($sales_subject));
+        ?>
+        <a class="ibex-button ibex-button--outline" href="<?php echo esc_url($sales_mailto); ?>">
+          <?php esc_html_e('Contact Sales', 'ibex-racing-child'); ?>
+        </a>
         <?php if (is_user_logged_in() && current_user_can('edit_listings')) : ?>
           <?php
           $dashboard_url = ibex_get_page_link_by_template('page-listing-dashboard.php');
