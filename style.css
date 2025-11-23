@@ -751,7 +751,28 @@
   width: auto;
   position: relative;
   z-index: 1;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: zoom-in;
+  transition: max-width 300ms ease, max-height 300ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  touch-action: none;
+}
+
+.ibex-lightbox--zoomed .ibex-lightbox__image {
+  /* Remove size constraints to allow full-resolution zoom */
+  /* Image will display at its natural resolution, which may exceed viewport */
+  max-width: none;
+  max-height: none;
+  width: auto;
+  height: auto;
+  cursor: zoom-out;
+  transition: max-width 300ms ease, max-height 300ms ease;
+}
+
+.ibex-lightbox--zoomed .ibex-lightbox__image:active {
+  cursor: grabbing;
 }
 
 .ibex-lightbox__close,

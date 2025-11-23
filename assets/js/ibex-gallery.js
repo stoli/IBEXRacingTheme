@@ -75,6 +75,111 @@
 
     let previousFocus = null;
     let currentIndex = 0;
+    let isZoomed = false;
+    let isPanning = false;
+    let panStartMouseX = 0; // Initial mouse X position when pan starts
+    let panStartMouseY = 0; // Initial mouse Y position when pan starts
+    let panStartPanX = 0; // Initial pan X offset when pan starts
+    let panStartPanY = 0; // Initial pan Y offset when pan starts
+    let panX = 0;
+    let panY = 0;
+    let hasPanned = false; // Track if user actually panned (moved mouse)
+    let panStartTime = 0;
+
+    const toggleZoom = () => {
+      isZoomed = !isZoomed;
+      if (isZoomed) {
+        lightbox.classList.add('ibex-lightbox--zoomed');
+        // Reset pan position when zooming in
+        panX = 0;
+        panY = 0;
+        updateImageTransform();
+        lightboxImage.style.cursor = 'zoom-out';
+      } else {
+        lightbox.classList.remove('ibex-lightbox--zoomed');
+        // Reset pan position when zooming out
+        panX = 0;
+        panY = 0;
+        updateImageTransform();
+        lightboxImage.style.cursor = 'zoom-in';
+      }
+    };
+
+    const updateImageTransform = () => {
+      if (isZoomed) {
+        lightboxImage.style.transform = `translate(${panX}px, ${panY}px)`;
+      } else {
+        lightboxImage.style.transform = 'translate(0, 0)';
+      }
+    };
+
+    const startPan = (clientX, clientY) => {
+      if (!isZoomed) {
+        return;
+      }
+      isPanning = true;
+      hasPanned = false;
+      // Store initial mouse position and current pan offset
+      panStartMouseX = clientX;
+      panStartMouseY = clientY;
+      panStartPanX = panX;
+      panStartPanY = panY;
+      panStartTime = Date.now();
+      lightboxImage.style.cursor = 'grabbing';
+    };
+
+    const doPan = (clientX, clientY) => {
+      if (!isPanning || !isZoomed) {
+        return;
+      }
+      
+      // Calculate mouse movement
+      const deltaX = clientX - panStartMouseX;
+      const deltaY = clientY - panStartMouseY;
+      
+      // Check if user has moved the mouse significantly (more than 5px)
+      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+        hasPanned = true;
+      }
+      
+      // Calculate new pan position: initial pan + mouse movement
+      panX = panStartPanX + deltaX;
+      panY = panStartPanY + deltaY;
+      
+      // Constrain panning to image bounds
+      const imageRect = lightboxImage.getBoundingClientRect();
+      const frameRect = lightbox.querySelector('.ibex-lightbox__frame').getBoundingClientRect();
+      
+      const maxX = Math.max(0, (imageRect.width - frameRect.width) / 2);
+      const maxY = Math.max(0, (imageRect.height - frameRect.height) / 2);
+      
+      panX = Math.max(-maxX, Math.min(maxX, panX));
+      panY = Math.max(-maxY, Math.min(maxY, panY));
+      
+      updateImageTransform();
+    };
+
+    const stopPan = () => {
+      if (isPanning) {
+        isPanning = false;
+        lightboxImage.style.cursor = 'zoom-out';
+        
+        // Reset hasPanned flag after a short delay to allow click detection
+        // Only reset if it was a quick click (less than 200ms) and no movement
+        const panDuration = Date.now() - panStartTime;
+        if (panDuration < 200 && !hasPanned) {
+          // Quick click without panning - allow zoom toggle
+          setTimeout(() => {
+            hasPanned = false;
+          }, 50);
+        } else {
+          // User panned - prevent click from toggling zoom
+          setTimeout(() => {
+            hasPanned = false;
+          }, 300);
+        }
+      }
+    };
 
     const updateNavigationVisibility = () => {
       // Always show buttons - hide only if there's truly only one image
@@ -119,6 +224,15 @@
       const targetImage = targetLink.querySelector('img');
       lightboxImage.src = targetLink.getAttribute('href');
       lightboxImage.alt = targetImage ? targetImage.alt : '';
+      
+      // Reset zoom and pan when changing images
+      if (isZoomed) {
+        isZoomed = false;
+        lightbox.classList.remove('ibex-lightbox--zoomed');
+      }
+      panX = 0;
+      panY = 0;
+      updateImageTransform();
     };
 
     const openLightbox = (index, trigger) => {
@@ -144,8 +258,14 @@
 
     const closeLightbox = () => {
       lightbox.classList.remove('ibex-lightbox--active');
+      lightbox.classList.remove('ibex-lightbox--zoomed');
       document.body.classList.remove('ibex-lightbox-open');
       lightboxImage.src = '';
+      isZoomed = false;
+      isPanning = false;
+      panX = 0;
+      panY = 0;
+      updateImageTransform();
       if (previousFocus) {
         previousFocus.focus();
       }
@@ -194,6 +314,63 @@
       event.preventDefault();
       event.stopPropagation();
       closeLightbox();
+    });
+
+    // Click on image to toggle zoom (only if not panning or just panned)
+    lightboxImage.addEventListener('click', (event) => {
+      // Don't toggle zoom if we're currently panning or just finished panning
+      if (isPanning || hasPanned) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      toggleZoom();
+    });
+
+    // Mouse events for panning
+    lightboxImage.addEventListener('mousedown', (event) => {
+      if (!isZoomed) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      startPan(event.clientX, event.clientY);
+    });
+
+    document.addEventListener('mousemove', (event) => {
+      if (isPanning && isZoomed) {
+        event.preventDefault();
+        doPan(event.clientX, event.clientY);
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      stopPan();
+    });
+
+    // Touch events for mobile panning
+    lightboxImage.addEventListener('touchstart', (event) => {
+      if (!isZoomed || event.touches.length !== 1) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const touch = event.touches[0];
+      startPan(touch.clientX, touch.clientY);
+    });
+
+    document.addEventListener('touchmove', (event) => {
+      if (isPanning && isZoomed && event.touches.length === 1) {
+        event.preventDefault();
+        const touch = event.touches[0];
+        doPan(touch.clientX, touch.clientY);
+      }
+    });
+
+    document.addEventListener('touchend', () => {
+      stopPan();
     });
 
     lightbox.addEventListener('click', (event) => {
