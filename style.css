@@ -4081,6 +4081,10 @@ body.ibex-lightbox-open {
   margin-bottom: 0.75rem;
 }
 
+.ibex-home-sidebar-card--team .ibex-home-sidebar-card__content {
+  padding-top: clamp(1rem, 2.5vw, 1.5rem); /* Add top padding to prevent text clipping from border-radius */
+}
+
 .ibex-home-sidebar-card__header {
   display: flex;
   justify-content: space-between;
@@ -4199,11 +4203,39 @@ body.ibex-lightbox-open {
   }
 
   .ibex-home-layout {
-    padding: 0 clamp(1rem, 5vw, 1.75rem);
+    padding: 0; /* No padding - sections handle their own spacing */
+    grid-template-columns: 1fr; /* Single column on mobile */
+    margin: clamp(1.25rem, 3vw, 1.75rem) auto 0; /* Restore margin for spacing */
+    max-width: 100%; /* Full width on mobile */
   }
 
   .ibex-event-grid--feature {
     grid-template-columns: 1fr;
+  }
+
+  /* Consistent padding for all archive sections on mobile */
+  .ibex-home-layout .ibex-archive-section {
+    padding: clamp(1rem, 2.5vw, 1.5rem); /* Match gallery section padding */
+  }
+
+  /* Sidebar section - same padding as primary section on mobile */
+  .ibex-home-layout .ibex-home-sidebar.ibex-archive-section {
+    padding: clamp(1rem, 2.5vw, 1.5rem); /* Match primary section padding */
+  }
+
+  /* Ensure sidebar and sidebar cards are full width on mobile */
+  .ibex-home-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .ibex-home-sidebar-card {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .ibex-home-sidebar-card--full-width {
+    width: 100%;
+    max-width: 100%;
   }
 }
 
